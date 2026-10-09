@@ -292,14 +292,35 @@ Following **UI/UX Pro Max** guidelines for an academic scheduling command center
 - [x] Rooms & Laboratories management with capacity filtering and department affinity tagging.
 - [x] 13 new backend pytest tests (55 passing total) and 8 new frontend vitest tests (17 passing total).
 
-### Phase 6: Automatic Timetable Generator Engine
-- Implement CSP solver (`apps/scheduling/engine.py`):
-  - Backtracking with MRV heuristic.
-  - Hard constraint checks (no double booking, room capacity, lab block contiguity).
-  - Shift and break slot protection.
-- Infeasibility diagnostic reporter (explaining why a schedule cannot be formed).
-- Independent Timetable Validator (`apps/scheduling/validator.py`).
-- Comprehensive unit test suite with 10+ constraint edge cases.
+### Phase 6: Automatic Timetable Generator Engine (Completed)
+- [x] Implemented standalone Python scheduling engine inside `backend/apps/scheduling/services/` with strict separation of concerns:
+  - `requirement_loader.py`: In-memory `SchedulingContext` extraction resolving sections, slots, rooms, faculty availability, workload limits, curriculum requirements, and locked bookings.
+  - `session_expander.py`: Deconstructs weekly curriculum teaching requirements into atomic `SchedulableSession` units with linked UUIDs for multi-period blocks.
+  - `placement_generator.py`: Candidate domain pre-filtering adhering to shift timings, contiguous non-break slots, room type and capacity, faculty availability, and soft scoring.
+  - `solver.py`: Constraint-based CSP solver with Most Constrained Variable (MRV) ordering, Degree heuristic tie-breaker, forward checking with domain wipeout detection, and configurable search limits.
+  - `validator.py`: Independent schedule validation engine (`validate_schedule` and `validate_timetable_instance`) checking all 12 hard constraints with structured diagnostic codes.
+  - `diagnostics.py`: Conflict diagnostics service analyzing operational bottlenecks (room capacity, room type, faculty availability saturation, shift slot saturation).
+  - `persistence.py`: Atomic database persistence service preserving locked entries, preventing overwriting of published schedules, and logging to `TimetableAuditLog`.
+  - `engine.py`: High-level orchestrator facade unifying the end-to-end generation lifecycle.
+- [x] Authenticated REST API endpoints under `/api/v1/timetables/`:
+  - `POST /api/v1/timetables/generate/`: Scope-defined timetable generation (Admin only).
+  - `GET /api/v1/timetables/{id}/conflicts/`: Diagnostic validation conflict inspection.
+  - `POST /api/v1/timetables/{id}/validate/`: Draft re-validation.
+  - `GET /api/v1/timetables/{id}/entries/`: Filterable scheduled session retrieval.
+  - `POST /api/v1/timetables/{id}/publish/`: Validation-gated timetable publication.
+  - `GET /api/v1/timetables/generation-jobs/{id}/`: Job status retrieval.
+  - `POST /api/v1/timetables/entry-records/{id}/lock/` and `unlock/`: Granular slot locking.
+- [x] Frontend React Integration:
+  - Timetable Generation Wizard with Academic Scope selection (AY, Shift, Dept, Semester, Section).
+  - Engine Optimization controls (Max Backtracks, Timeout seconds, Title, Notes).
+  - Real-time generation progress, status banners, and search metric cards (Sessions, Backtracks, Duration, Nodes).
+  - Conflict Diagnostics Panel with bottleneck categories, affected entities, and recommended actions.
+  - Weekly Timetable Grid Preview with period/day layout, section filter, lab badges, and slot lock/unlock toggles.
+  - Institutional Timetable List Page (`/timetables`) with status filtering.
+- [x] Full Test Verification:
+  - 10 new backend tests (65 total passing) covering solver correctness, collision prevention, multi-section shared faculty/rooms, consecutive lab contiguity, room capacity/type, workload limits, locked entry preservation, independent validator corruption detection, search limit handling, publication gate, and role authorization.
+  - 3 new frontend tests (20 total passing) verifying wizard rendering, generation mutation, diagnostics display, and validation actions.
+  - Zero TypeScript errors (`tsc && vite build` passing).
 
 ### Phase 7: Timetable Management, Interactive Grid & Editor
 - Dynamic weekly timetable grid supporting filters (by section, faculty, room, shift).

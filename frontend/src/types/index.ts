@@ -278,3 +278,119 @@ export interface Room {
   floor?: number;
   is_active: boolean;
 }
+
+export type TimetableStatus = 'DRAFT' | 'REVIEW' | 'PUBLISHED' | 'ARCHIVED';
+
+export interface TimetableEntry {
+  id: number;
+  timetable: number;
+  section: number;
+  section_name?: string;
+  subject: number;
+  subject_code?: string;
+  subject_name?: string;
+  subject_type?: SubjectType;
+  faculty: number;
+  faculty_name?: string;
+  faculty_employee_id?: string;
+  room: number;
+  room_code?: string;
+  room_name?: string;
+  room_type?: RoomType;
+  period_slot: number;
+  period_number?: number;
+  start_time?: string;
+  end_time?: string;
+  day_of_week: DayCode;
+  is_locked: boolean;
+  linked_session_id?: string | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface Timetable {
+  id: number;
+  academic_year: number;
+  academic_year_name?: string;
+  shift: number;
+  shift_name?: string;
+  department?: number | null;
+  department_name?: string | null;
+  department_code?: string | null;
+  semester?: number | null;
+  semester_name?: string | null;
+  name: string;
+  status: TimetableStatus;
+  status_display?: string;
+  version: number;
+  notes?: string;
+  created_by?: number | null;
+  created_by_username?: string | null;
+  entries_count: number;
+  published_at?: string | null;
+  created_at: string;
+  updated_at: string;
+  entries?: TimetableEntry[];
+}
+
+export interface ScheduleConflict {
+  conflict_code: string;
+  severity: 'ERROR' | 'WARNING';
+  message: string;
+  section_id?: number | null;
+  section_name?: string | null;
+  faculty_id?: number | null;
+  faculty_name?: string | null;
+  room_id?: number | null;
+  room_name?: string | null;
+  period_slot_ids: number[];
+  day_of_week?: string | null;
+  subject_code?: string | null;
+  suggested_action?: string | null;
+}
+
+export interface ValidationReport {
+  is_valid: boolean;
+  total_conflicts: number;
+  hard_constraint_violations: number;
+  sessions_required: number;
+  sessions_scheduled: number;
+  summary: string;
+  conflicts: ScheduleConflict[];
+}
+
+export interface DiagnosticBottleneck {
+  category: string;
+  summary: string;
+  affected_entity: string;
+  suggested_action: string;
+}
+
+export interface GenerateSchedulePayload {
+  academic_year_id: number;
+  shift_id?: number | null;
+  department_ids?: number[];
+  semester_ids?: number[];
+  section_ids?: number[];
+  timetable_id?: number | null;
+  name?: string;
+  notes?: string;
+  max_backtracks?: number;
+  timeout_seconds?: number;
+  persist?: boolean;
+}
+
+export interface GenerationResult {
+  success: boolean;
+  status: 'SUCCESS' | 'INFEASIBLE' | 'LIMIT_REACHED' | 'VALIDATION_FAILED' | 'ERROR';
+  message: string;
+  timetable_id?: number | null;
+  sessions_required: number;
+  sessions_scheduled: number;
+  backtracks_count: number;
+  duration_seconds: number;
+  nodes_explored: number;
+  validation_report?: ValidationReport | null;
+  bottlenecks: DiagnosticBottleneck[];
+}
+

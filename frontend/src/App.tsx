@@ -28,6 +28,8 @@ import { QualificationsPage } from './pages/faculty/QualificationsPage';
 import { SubjectAllocationPage } from './pages/faculty/SubjectAllocationPage';
 import { FacultyWorkloadPage } from './pages/faculty/FacultyWorkloadPage';
 import { RoomsPage } from './pages/rooms/RoomsPage';
+import { TimetableGenerationPage } from './pages/timetables/TimetableGenerationPage';
+import { TimetableListPage } from './pages/timetables/TimetableListPage';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -70,6 +72,10 @@ export const App: React.FC = () => {
 
               {/* Rooms & Labs */}
               <Route path="rooms" element={<RoomsPage />} />
+
+              {/* Automatic Timetable Generation & Management */}
+              <Route path="timetables" element={<TimetableListPage />} />
+              <Route path="timetables/generate" element={<TimetableGenerationPage />} />
 
               {/* Academic Setup Pages */}
               <Route path="academics/colleges" element={<CollegesPage />} />

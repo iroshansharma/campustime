@@ -198,6 +198,19 @@ Enforces qualifications, workload thresholds, and institution-level isolation. S
 | `/api/v1/rooms/rooms/` | `GET`, `POST`, `PUT`, `PATCH`, `DELETE` | `?department=<id>&room_type=LAB&min_capacity=40` |
 | `/api/v1/rooms/availability/` | `GET`, `POST`, `PUT`, `PATCH`, `DELETE` | `?room=<id>&is_available=true` |
 
+### Timetable Generation & Scheduling Endpoints
+| Endpoint | Supported Operations | Description |
+|---|---|---|
+| `/api/v1/timetables/generate/` | `POST` | Scope-defined automated CSP timetable generation (Admin only) |
+| `/api/v1/timetables/` | `GET`, `POST`, `PUT`, `DELETE` | Timetable list (Admin: all, Faculty/Student: published only) |
+| `/api/v1/timetables/{id}/` | `GET`, `PUT`, `PATCH`, `DELETE` | Timetable detail with nested scheduled sessions |
+| `/api/v1/timetables/{id}/entries/` | `GET` | Filter entries by `?section=<id>&faculty=<id>&room=<id>&day_of_week=MON` |
+| `/api/v1/timetables/{id}/conflicts/` | `GET` | Independent constraint validation diagnostics inspection |
+| `/api/v1/timetables/{id}/validate/` | `POST` | Re-validate draft timetable instance server-side |
+| `/api/v1/timetables/{id}/publish/` | `POST` | Validation-gated timetable publication |
+| `/api/v1/timetables/entry-records/{id}/lock/` | `POST` | Lock manual slot pin to preserve during regeneration |
+| `/api/v1/timetables/entry-records/{id}/unlock/` | `POST` | Unlock slot allowing generator reallocation |
+
 ---
 
 ### 3. Frontend Setup
@@ -225,14 +238,14 @@ The application will be accessible at `http://localhost:5173/`.
 ```bash
 cd backend
 .\venv\Scripts\pytest
-# (55 tests passing covering models, constraints, auth, academics, faculty, availability, allocations, and rooms)
+# (65 tests passing covering models, constraints, auth, academics, faculty, rooms, CSP engine, validation, and diagnostics)
 ```
 
 ### Frontend Tests (Vitest)
 ```bash
 cd frontend
 npx vitest run
-# (17 tests passing covering auth, routing, availability grid, and subject allocation workflows)
+# (20 tests passing covering auth, routing, availability grid, subject allocation, and generation wizard)
 ```
 
 ---

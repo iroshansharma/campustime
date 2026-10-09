@@ -3,7 +3,7 @@ import { NavLink } from 'react-router-dom';
 import {
   LayoutDashboard, Building2, CalendarRange, Clock,
   CalendarDays, Layers, BookOpen, Users, LogOut,
-  ChevronLeft, ChevronRight, GraduationCap
+  ChevronLeft, ChevronRight, GraduationCap, Sparkles
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { Badge } from '../common/Badge';
@@ -25,6 +25,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   const adminNav = [
     { label: 'Overview', to: '/dashboard', icon: LayoutDashboard },
+    { label: 'Timetable Generator', to: '/timetables/generate', icon: Sparkles },
+    { label: 'All Timetables', to: '/timetables', icon: CalendarRange },
     { label: 'Faculty Directory', to: '/faculty/members', icon: Users },
     { label: 'Availability Matrix', to: '/faculty/availability', icon: CalendarDays },
     { label: 'Qualifications', to: '/faculty/qualifications', icon: GraduationCap },
@@ -44,6 +46,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   const facultyNav = [
     { label: 'Dashboard', to: '/dashboard', icon: LayoutDashboard },
+    { label: 'Timetables', to: '/timetables', icon: CalendarRange },
     { label: 'My Availability', to: '/faculty/availability', icon: CalendarDays },
     { label: 'Workload Overview', to: '/faculty/workload', icon: Layers },
     { label: 'Departments', to: '/academics/departments', icon: Layers },
@@ -52,6 +55,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   const studentNav = [
     { label: 'Dashboard', to: '/dashboard', icon: LayoutDashboard },
+    { label: 'Timetables', to: '/timetables', icon: CalendarRange },
     { label: 'My Section', to: '/academics/sections', icon: Users },
     { label: 'Subjects', to: '/academics/subjects', icon: BookOpen },
   ];

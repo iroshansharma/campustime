@@ -19,6 +19,7 @@ urlpatterns = [
     path('api/v1/academics/', include('apps.academics.urls', namespace='academics')),
     path('api/v1/faculty/', include('apps.faculty.urls', namespace='faculty')),
     path('api/v1/rooms/', include('apps.rooms.urls', namespace='rooms')),
+    path('api/v1/timetables/', include('apps.timetables.urls', namespace='timetables')),
 
     # API Documentation (OpenAPI 3 / Swagger / ReDoc)
     path('api/v1/schema/', SpectacularAPIView.as_view(), name='schema'),
