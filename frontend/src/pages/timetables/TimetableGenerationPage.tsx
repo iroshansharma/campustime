@@ -4,7 +4,7 @@ import {
   Sparkles, AlertCircle, CheckCircle2, Clock,
   Layers, ShieldCheck, Lock, Unlock,
   RefreshCw, Send, AlertTriangle, Download,
-  BarChart3, GitFork, Edit3
+  BarChart3, GitFork, Edit3, Info
 } from 'lucide-react';
 import { academicsService } from '../../services/academicsService';
 import { timetableService } from '../../services/timetableService';
@@ -35,8 +35,8 @@ export const TimetableGenerationPage: React.FC = () => {
   // Engine Settings
   const [timetableName, setTimetableName] = useState<string>('');
   const [notes, setNotes] = useState<string>('');
-  const [maxBacktracks, setMaxBacktracks] = useState<number>(5000);
-  const [timeoutSeconds, setTimeoutSeconds] = useState<number>(30);
+  const [maxBacktracks, setMaxBacktracks] = useState<number>(50000);
+  const [timeoutSeconds, setTimeoutSeconds] = useState<number>(60);
 
   // Result & Active Timetable
   const [generationResult, setGenerationResult] = useState<GenerationResult | null>(null);
@@ -493,8 +493,8 @@ export const TimetableGenerationPage: React.FC = () => {
                 <input
                   type="number"
                   min="500"
-                  max="50000"
-                  step="500"
+                  max="100000"
+                  step="1000"
                   value={maxBacktracks}
                   onChange={(e) => setMaxBacktracks(Number(e.target.value))}
                   className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
@@ -508,7 +508,7 @@ export const TimetableGenerationPage: React.FC = () => {
                 <input
                   type="number"
                   min="5"
-                  max="120"
+                  max="300"
                   value={timeoutSeconds}
                   onChange={(e) => setTimeoutSeconds(Number(e.target.value))}
                   className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
@@ -548,24 +548,76 @@ export const TimetableGenerationPage: React.FC = () => {
             className={`p-4 rounded-xl border flex items-start gap-3 ${
               generationResult.success
                 ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
+                : generationResult.status === 'LIMIT_REACHED'
+                ? 'bg-amber-50 border-amber-200 text-amber-900'
                 : 'bg-rose-50 border-rose-200 text-rose-900'
             }`}
           >
             {generationResult.success ? (
               <CheckCircle2 className="h-5 w-5 text-emerald-600 shrink-0 mt-0.5" />
+            ) : generationResult.status === 'LIMIT_REACHED' ? (
+              <AlertTriangle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
             ) : (
               <AlertCircle className="h-5 w-5 text-rose-600 shrink-0 mt-0.5" />
             )}
             <div className="flex-1">
               <div className="flex items-center gap-2">
                 <span className="font-semibold text-sm">
-                  {generationResult.success ? 'Generation Succeeded' : `Generation ${generationResult.status}`}
+                  {generationResult.success
+                    ? 'Generation Succeeded'
+                    : generationResult.status === 'LIMIT_REACHED'
+                    ? 'Search Limit Reached (Not Proven Infeasible)'
+                    : generationResult.status === 'INFEASIBLE'
+                    ? 'Infeasible Requirements'
+                    : generationResult.status === 'VALIDATION_FAILED'
+                    ? 'Validation Failed'
+                    : 'Generation Failed'}
                 </span>
-                <Badge variant={generationResult.success ? 'success' : 'danger'}>
+                <Badge
+                  variant={
+                    generationResult.success
+                      ? 'success'
+                      : generationResult.status === 'LIMIT_REACHED'
+                      ? 'warning'
+                      : 'danger'
+                  }
+                >
                   {generationResult.status}
                 </Badge>
               </div>
               <p className="text-sm mt-0.5 opacity-90">{generationResult.message}</p>
+
+              {generationResult.status === 'LIMIT_REACHED' && (
+                <div className="mt-3 p-3 bg-white/70 border border-amber-300 rounded-lg text-xs space-y-1.5 text-amber-950">
+                  <div className="font-semibold flex items-center gap-1.5 text-amber-900">
+                    <Info className="h-4 w-4 text-amber-600" />
+                    Infeasibility is NOT proven. The search budget was exhausted before finding a solution.
+                  </div>
+                  <p className="text-slate-700">
+                    Configured search budget ({generationResult.backtracks_count.toLocaleString()} backtracks, {generationResult.duration_seconds}s) expired.
+                  </p>
+                  <div className="text-slate-700">
+                    <span className="font-semibold text-slate-800">Recommended Next Steps:</span>
+                    <ul className="list-disc list-inside mt-0.5 space-y-0.5 text-slate-600">
+                      <li>Increase the Max Backtracks budget (e.g. from 50,000 to 100,000) and Timeout (e.g. 60s) in Engine Optimization.</li>
+                      <li>Review faculty availability and ensure sufficient unblocked periods exist for assigned subjects.</li>
+                      <li>Check room inventory to ensure sufficient classrooms/labs match section capacities.</li>
+                    </ul>
+                  </div>
+                </div>
+              )}
+
+              {generationResult.status === 'INFEASIBLE' && (
+                <div className="mt-3 p-3 bg-white/70 border border-rose-300 rounded-lg text-xs space-y-1 text-rose-950">
+                  <div className="font-semibold flex items-center gap-1.5 text-rose-900">
+                    <AlertCircle className="h-4 w-4 text-rose-600" />
+                    Mathematically Infeasible Requirements Detected
+                  </div>
+                  <p className="text-slate-700">
+                    No combination of assignments can satisfy all 12 institutional constraints simultaneously. Review the Operational Bottlenecks panel below for specific resource deficits.
+                  </p>
+                </div>
+              )}
             </div>
           </div>
 

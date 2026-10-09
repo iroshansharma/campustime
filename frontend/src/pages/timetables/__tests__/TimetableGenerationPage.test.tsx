@@ -184,12 +184,52 @@ describe('TimetableGenerationPage', () => {
     fireEvent.click(generateBtn);
 
     await waitFor(() => {
-      expect(screen.getByText('Generation INFEASIBLE')).toBeInTheDocument();
+      expect(screen.getByText('Infeasible Requirements')).toBeInTheDocument();
       expect(screen.getByText('Operational Bottlenecks & Recommendations')).toBeInTheDocument();
       expect(screen.getByText('ROOM_CAPACITY')).toBeInTheDocument();
       expect(
         screen.getByText(/No classroom in inventory has sufficient capacity/i)
       ).toBeInTheDocument();
+    });
+  });
+
+  it('renders search limit reached warning and recommended next actions without duplicated status text', async () => {
+    const limitResult: GenerationResult = {
+      success: false,
+      status: 'LIMIT_REACHED',
+      message: 'Search limit reached (max backtrack limit (50000) after 0.45s, 50000 backtracks, 12000 nodes). No valid schedule found within configured search limits.',
+      sessions_required: 16,
+      sessions_scheduled: 10,
+      backtracks_count: 50000,
+      duration_seconds: 0.45,
+      nodes_explored: 12000,
+      bottlenecks: [],
+      validation_report: null,
+    };
+
+    vi.mocked(timetableService.generateSchedule).mockResolvedValue(limitResult);
+
+    renderComponent();
+
+    await waitFor(() => {
+      expect(screen.getByText('2024-25 (Current)')).toBeInTheDocument();
+    });
+
+    const aySelect = screen.getByLabelText('Academic Year');
+    fireEvent.change(aySelect, { target: { value: '1' } });
+
+    const generateBtn = screen.getByRole('button', { name: /generate timetable/i });
+    fireEvent.click(generateBtn);
+
+    await waitFor(() => {
+      expect(screen.getByText('Search Limit Reached (Not Proven Infeasible)')).toBeInTheDocument();
+      expect(screen.getByText('LIMIT_REACHED')).toBeInTheDocument();
+      expect(
+        screen.getByText(/Infeasibility is NOT proven. The search budget was exhausted before finding a solution./i)
+      ).toBeInTheDocument();
+      expect(screen.getByText(/Recommended Next Steps:/i)).toBeInTheDocument();
+      // Ensure no duplicated status text like LIMIT_REACHEDLIMIT_REACHED
+      expect(screen.queryByText(/LIMIT_REACHEDLIMIT_REACHED/i)).toBeNull();
     });
   });
 });

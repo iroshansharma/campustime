@@ -1,3 +1,4 @@
+from django.conf import settings
 from rest_framework import serializers
 from drf_spectacular.utils import extend_schema_field
 
@@ -84,8 +85,20 @@ class GenerateScheduleRequestSerializer(serializers.Serializer):
     timetable_id = serializers.IntegerField(required=False, allow_null=True)
     name = serializers.CharField(required=False, allow_blank=True, max_length=200)
     notes = serializers.CharField(required=False, allow_blank=True)
-    max_backtracks = serializers.IntegerField(required=False, default=5000, min_value=100, max_value=50000)
-    timeout_seconds = serializers.FloatField(required=False, default=30.0, min_value=1.0, max_value=120.0)
+    max_backtracks = serializers.IntegerField(
+        required=False,
+        default=lambda: getattr(settings, 'SCHEDULER_MAX_BACKTRACK_STEPS', 50000),
+        min_value=100,
+        max_value=200000,
+        help_text="Backtrack search budget limit (defaults to SCHEDULER_MAX_BACKTRACK_STEPS)."
+    )
+    timeout_seconds = serializers.FloatField(
+        required=False,
+        default=lambda: getattr(settings, 'SCHEDULER_TIMEOUT_SECONDS', 60.0),
+        min_value=1.0,
+        max_value=300.0,
+        help_text="Search timeout limit in seconds (defaults to SCHEDULER_TIMEOUT_SECONDS)."
+    )
     persist = serializers.BooleanField(required=False, default=True)
 
 

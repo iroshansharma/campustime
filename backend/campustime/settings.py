@@ -200,3 +200,22 @@ SIMPLE_JWT = {
 # CORS Configuration
 CORS_ALLOWED_ORIGINS = env('CORS_ALLOWED_ORIGINS')
 CORS_ALLOW_CREDENTIALS = True
+
+# Timetable Engine & Scheduler Configuration
+# Loaded from environment (.env) with strict validation
+_scheduler_timeout_raw = env('SCHEDULER_TIMEOUT_SECONDS', default=60.0)
+try:
+    SCHEDULER_TIMEOUT_SECONDS = float(_scheduler_timeout_raw)
+    if SCHEDULER_TIMEOUT_SECONDS <= 0:
+        raise ValueError("SCHEDULER_TIMEOUT_SECONDS must be positive.")
+except (ValueError, TypeError) as exc:
+    raise ValueError(f"Invalid SCHEDULER_TIMEOUT_SECONDS environment configuration: {exc}")
+
+_scheduler_backtracks_raw = env('SCHEDULER_MAX_BACKTRACK_STEPS', default=50000)
+try:
+    SCHEDULER_MAX_BACKTRACK_STEPS = int(_scheduler_backtracks_raw)
+    if SCHEDULER_MAX_BACKTRACK_STEPS <= 0:
+        raise ValueError("SCHEDULER_MAX_BACKTRACK_STEPS must be positive.")
+except (ValueError, TypeError) as exc:
+    raise ValueError(f"Invalid SCHEDULER_MAX_BACKTRACK_STEPS environment configuration: {exc}")
+

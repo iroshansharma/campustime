@@ -88,10 +88,12 @@ class TimetableViewSet(viewsets.ModelViewSet):
             timetable_id=data.get('timetable_id')
         )
 
-        config = SolverConfig(
-            max_backtracks=data.get('max_backtracks', 5000),
-            timeout_seconds=data.get('timeout_seconds', 30.0)
-        )
+        solver_kwargs = {}
+        if data.get('max_backtracks') is not None:
+            solver_kwargs['max_backtracks'] = data['max_backtracks']
+        if data.get('timeout_seconds') is not None:
+            solver_kwargs['timeout_seconds'] = data['timeout_seconds']
+        config = SolverConfig(**solver_kwargs)
 
         result = TimetableGenerationEngine.generate(
             scope=scope,

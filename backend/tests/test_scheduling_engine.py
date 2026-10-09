@@ -1,8 +1,10 @@
 import pytest
 from datetime import date, time
+from django.conf import settings
 from django.utils import timezone
 from rest_framework.test import APIClient
 from rest_framework import status
+from apps.timetables.serializers import GenerateScheduleRequestSerializer
 
 from apps.accounts.models import User
 from apps.academics.models import (
@@ -445,3 +447,134 @@ class TestSchedulingEngine:
 
         res = client.post("/api/v1/timetables/generate/", payload, format='json')
         assert res.status_code == status.HTTP_403_FORBIDDEN
+
+    def test_environment_configuration_reaches_solver(self):
+        """Verify environment variables and settings defaults reach SolverConfig and serializer."""
+        # 1. Django settings defaults
+        assert settings.SCHEDULER_MAX_BACKTRACK_STEPS == 50000
+        assert settings.SCHEDULER_TIMEOUT_SECONDS == 60.0
+
+        # 2. SolverConfig default factory values
+        config = SolverConfig()
+        assert config.max_backtracks == 50000
+        assert config.timeout_seconds == 60.0
+
+        # 3. GenerateScheduleRequestSerializer defaults
+        serializer = GenerateScheduleRequestSerializer(data={'academic_year_id': 1})
+        assert serializer.is_valid(), serializer.errors
+        assert serializer.validated_data['max_backtracks'] == 50000
+        assert serializer.validated_data['timeout_seconds'] == 60.0
+
+    def test_timeout_enforcement_independent_of_backtracks(self, scheduling_fixture):
+        """Verify that timeout budget is enforced accurately even with large backtrack budget."""
+        f = scheduling_fixture
+        scope = SchedulingScope(
+            academic_year_id=f['ay'].id,
+            section_ids=[f['sec_a'].id]
+        )
+
+        # Huge backtrack limit, tiny timeout (0.0001s)
+        config = SolverConfig(max_backtracks=500000, timeout_seconds=0.0001)
+        result = TimetableGenerationEngine.generate(
+            scope=scope,
+            config=config,
+            user=f['users']['admin']
+        )
+        assert result.success is False
+        assert result.status == 'LIMIT_REACHED'
+        assert "timeout" in result.message
+        assert result.duration_seconds < 2.0
+
+    def test_aggregate_infeasibility_faculty_workload_overload(self, scheduling_fixture):
+        """Verify immediate zero-backtrack proof of infeasibility when faculty workload is overloaded."""
+        f = scheduling_fixture
+        # Alice is assigned 3 periods of DS for Sec A.
+        # Set Alice's max limits to 2 periods (< 3 required).
+        f['faculty']['alice'].max_daily_periods = 2
+        f['faculty']['alice'].max_weekly_periods = 2
+        f['faculty']['alice'].save()
+
+        scope = SchedulingScope(
+            academic_year_id=f['ay'].id,
+            section_ids=[f['sec_a'].id]
+        )
+
+        result = TimetableGenerationEngine.generate(
+            scope=scope,
+            user=f['users']['admin']
+        )
+        assert result.success is False
+        assert result.status == 'INFEASIBLE'
+        assert result.backtracks_count == 0  # Proven immediately before deep backtracking
+        assert "exceeding their max limit" in result.message or "Infeasibility proven" in result.message
+        assert any(b.category == 'WORKLOAD_LIMIT' for b in result.bottlenecks)
+
+    def test_failed_or_limited_generation_does_not_corrupt_existing_timetable(self, scheduling_fixture):
+        """Verify failed generation attempts preserve the previously valid timetable untouched."""
+        f = scheduling_fixture
+        scope = SchedulingScope(
+            academic_year_id=f['ay'].id,
+            section_ids=[f['sec_a'].id]
+        )
+
+        # 1. Generate a valid initial schedule
+        res1 = TimetableGenerationEngine.generate(
+            scope=scope,
+            user=f['users']['admin'],
+            timetable_name="Original Valid Timetable"
+        )
+        assert res1.success is True
+        timetable_id = res1.timetable_id
+        original_tt = Timetable.objects.get(id=timetable_id)
+        assert original_tt.entries.count() == 8
+
+        # 2. Attempt regeneration targeting the same timetable with an impossible constraint (0 backtracks)
+        scope.timetable_id = timetable_id
+        config = SolverConfig(max_backtracks=0, timeout_seconds=0.0001)
+        res2 = TimetableGenerationEngine.generate(
+            scope=scope,
+            config=config,
+            user=f['users']['admin']
+        )
+        assert res2.success is False
+        assert res2.status == 'LIMIT_REACHED'
+
+        # 3. Verify original timetable entries and state were not wiped or corrupted
+        original_tt.refresh_from_db()
+        assert original_tt.entries.count() == 8
+        assert original_tt.status == Timetable.Status.DRAFT
+
+    def test_search_state_restoration_after_backtracking(self, scheduling_fixture):
+        """Verify that forward checking and search state restoration leave no residual locks after backtracking."""
+        f = scheduling_fixture
+        scope = SchedulingScope(
+            academic_year_id=f['ay'].id,
+            section_ids=[f['sec_a'].id]
+        )
+        context = RequirementLoader.load_context(scope)
+        sessions = SessionExpander.expand_requirements(context)
+        domains = PlacementGenerator.generate_candidate_domains(sessions, context)
+
+        solver = ConstraintSolver(
+            context=context,
+            sessions=sessions,
+            domains=domains,
+            config=SolverConfig(max_backtracks=2000, timeout_seconds=15.0)
+        )
+        result = solver.solve()
+        assert result.success is True
+
+        # Total scheduled entries
+        total_slots_assigned = sum(len(p.slot_ids) for p in result.assignments.values())
+        assert len(solver.section_slots) == total_slots_assigned
+        assert len(solver.faculty_slots) == total_slots_assigned
+        assert len(solver.room_slots) == total_slots_assigned
+
+        # Ensure faculty weekly workload tracking exactly matches assigned slots
+        for fac_id in context.faculty:
+            fac_slots = sum(
+                len(p.slot_ids) for p in result.assignments.values()
+                if p.session.faculty_id == fac_id
+            )
+            assert solver.faculty_weekly_load.get(fac_id, 0) == fac_slots
+

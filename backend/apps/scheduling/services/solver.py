@@ -2,15 +2,31 @@ import time
 from dataclasses import dataclass, field
 from typing import List, Dict, Set, Optional, Tuple
 
+from django.conf import settings
+
 from .requirement_loader import SchedulingContext
 from .session_expander import SchedulableSession
 from .placement_generator import Placement
 
 
+def _get_default_max_backtracks() -> int:
+    try:
+        return getattr(settings, 'SCHEDULER_MAX_BACKTRACK_STEPS', 50000)
+    except Exception:
+        return 50000
+
+
+def _get_default_timeout_seconds() -> float:
+    try:
+        return getattr(settings, 'SCHEDULER_TIMEOUT_SECONDS', 60.0)
+    except Exception:
+        return 60.0
+
+
 @dataclass
 class SolverConfig:
-    max_backtracks: int = 5000
-    timeout_seconds: float = 30.0
+    max_backtracks: int = field(default_factory=_get_default_max_backtracks)
+    timeout_seconds: float = field(default_factory=_get_default_timeout_seconds)
 
 
 @dataclass
@@ -31,8 +47,10 @@ class ConstraintSolver:
     
     Features:
     - Minimum Remaining Values (MRV) variable ordering.
-    - Degree heuristic as tie-breaker.
-    - Forward checking with domain wipeout detection.
+    - Degree heuristic as tie-breaker (shared faculty/section graph degree & lab duration).
+    - Least Constraining Value (LCV) candidate placement ordering.
+    - Forward checking with immediate domain wipeout detection.
+    - Upfront aggregate infeasibility detection (mathematically impossible loads).
     - Hard constraint enforcement: section, faculty, and room collision prevention,
       faculty daily & weekly workload limits, contiguous lab blocks.
     - Soft optimization order: faculty preferred slots, qualification preference, balanced distribution.
@@ -86,12 +104,64 @@ class ConstraintSolver:
                 self.faculty_weekly_load.get(entry.faculty_id, 0) + 1
             )
 
+    def _check_aggregate_infeasibility(self) -> Optional[Tuple[str, List[SchedulableSession]]]:
+        """
+        Detects mathematically impossible requirements before entering deep backtracking.
+        Checks aggregate capacity invariants:
+        1. Total section periods required vs available non-break shift slots.
+        2. Total faculty assigned periods vs faculty max weekly periods.
+        """
+        # 1. Section capacity check
+        for sec_id, sec_data in self.context.sections.items():
+            sec_sessions = [s for s in self.sessions if s.section_id == sec_id]
+            total_sec_needed = sum(s.duration_slots for s in sec_sessions)
+            
+            avail_shift_slots = len([
+                s for s in self.context.slots
+                if s.shift_id == sec_data.shift_id and not s.is_break
+            ])
+            if total_sec_needed > avail_shift_slots:
+                return (
+                    f"Infeasibility proven: Section '{sec_data.name}' requires {total_sec_needed} periods, "
+                    f"exceeding the total available non-break slots ({avail_shift_slots}) in Shift {sec_data.shift_id}.",
+                    sec_sessions
+                )
+
+        # 2. Faculty weekly workload check
+        for fac_id, fac_data in self.context.faculty.items():
+            fac_sessions = [s for s in self.sessions if s.faculty_id == fac_id]
+            locked_periods = self.faculty_weekly_load.get(fac_id, 0)
+            total_fac_needed = sum(s.duration_slots for s in fac_sessions) + locked_periods
+
+            if total_fac_needed > fac_data.max_weekly_periods:
+                return (
+                    f"Infeasibility proven: Faculty '{fac_data.name}' requires {total_fac_needed} weekly teaching periods "
+                    f"({total_fac_needed - locked_periods} new + {locked_periods} locked), exceeding their max limit of "
+                    f"{fac_data.max_weekly_periods} periods/week.",
+                    fac_sessions
+                )
+
+        return None
+
     def solve(self) -> SolverResult:
-        self.start_time = time.time()
+        self.start_time = time.perf_counter()
         self.backtracks = 0
         self.nodes_explored = 0
         self.timed_out = False
         self.limit_hit = False
+
+        # 0. Check immediate aggregate infeasibility
+        infeasible_check = self._check_aggregate_infeasibility()
+        if infeasible_check:
+            msg, unassigned = infeasible_check
+            elapsed = time.perf_counter() - self.start_time
+            return SolverResult(
+                success=False,
+                status='INFEASIBLE',
+                message=msg,
+                unassigned_sessions=unassigned,
+                duration_seconds=elapsed
+            )
 
         # 1. Prune initial domains against locked entries & external bookings
         pruned_domains: Dict[str, List[Placement]] = {}
@@ -104,7 +174,7 @@ class ConstraintSolver:
 
             # If any session has 0 legal placements from the start, it is proven infeasible
             if not valid_candidates:
-                elapsed = time.time() - self.start_time
+                elapsed = time.perf_counter() - self.start_time
                 return SolverResult(
                     success=False,
                     status='INFEASIBLE',
@@ -122,7 +192,7 @@ class ConstraintSolver:
 
         # 2. Run backtracking search
         success = self._backtrack(assignments, unassigned_ids, pruned_domains)
-        elapsed = time.time() - self.start_time
+        elapsed = time.perf_counter() - self.start_time
 
         if success:
             return SolverResult(
@@ -179,7 +249,7 @@ class ConstraintSolver:
             if (p.room_id, slot_id) in self.room_slots:
                 return False
 
-        # 2. Check faculty daily workload
+        # 2. Check faculty daily and weekly workload limits
         fac_data = self.context.faculty.get(sess.faculty_id)
         if fac_data:
             current_day_load = self.faculty_daily_load.get((sess.faculty_id, p.day_of_week), 0)
@@ -199,27 +269,73 @@ class ConstraintSolver:
     ) -> str:
         """
         MRV (Minimum Remaining Values) heuristic with Degree heuristic tie-breaker.
+        Selects the unassigned session with fewest remaining valid candidate placements.
+        Ties broken by Degree (number of constraints on other unassigned sessions)
+        and duration (multi-period lab sessions first).
         """
         best_sid = None
         min_domain_size = float('inf')
         max_degree = -1
 
         for sid in unassigned_ids:
-            domain_size = len(domains.get(sid, []))
+            domain = domains.get(sid, [])
+            domain_size = len(domain)
+
+            # If any variable has 0 remaining valid candidates, select it immediately
+            if domain_size == 0:
+                return sid
+
+            sess = self.session_map[sid]
+
             if domain_size < min_domain_size:
                 min_domain_size = domain_size
                 best_sid = sid
-                sess = self.session_map[sid]
-                # Degree: duration and number of shared faculty/section/room constraints
-                max_degree = sess.duration_slots
+                max_degree = sum(
+                    1 for oid in unassigned_ids
+                    if oid != sid and (
+                        self.session_map[oid].section_id == sess.section_id or
+                        self.session_map[oid].faculty_id == sess.faculty_id
+                    )
+                ) + (sess.duration_slots - 1) * 5
             elif domain_size == min_domain_size:
-                sess = self.session_map[sid]
-                degree = sess.duration_slots
+                degree = sum(
+                    1 for oid in unassigned_ids
+                    if oid != sid and (
+                        self.session_map[oid].section_id == sess.section_id or
+                        self.session_map[oid].faculty_id == sess.faculty_id
+                    )
+                ) + (sess.duration_slots - 1) * 5
                 if degree > max_degree:
                     max_degree = degree
                     best_sid = sid
+                elif degree == max_degree:
+                    if sess.duration_slots > self.session_map[best_sid].duration_slots:
+                        best_sid = sid
 
-        return best_sid
+        return best_sid or next(iter(unassigned_ids))
+
+    def _order_candidate_placements(
+        self,
+        var_id: str,
+        candidates: List[Placement],
+        unassigned_ids: Set[str]
+    ) -> List[Placement]:
+        """
+        Orders candidate placements using Least-Constraining Value (LCV) principles,
+        faculty workload balance, and soft optimization scores.
+        """
+        if len(candidates) <= 1:
+            return candidates
+
+        sess = self.session_map[var_id]
+
+        def placement_priority(p: Placement) -> Tuple[int, float]:
+            # 1. Faculty daily load on this day (lower current load first to balance across days)
+            current_day_load = self.faculty_daily_load.get((sess.faculty_id, p.day_of_week), 0)
+            # 2. Soft score (higher faculty preference first, negated for ascending sort)
+            return (current_day_load, -p.score)
+
+        return sorted(candidates, key=placement_priority)
 
     def _backtrack(
         self,
@@ -232,7 +348,7 @@ class ConstraintSolver:
             return True
 
         # Check search limits
-        if time.time() - self.start_time > self.config.timeout_seconds:
+        if time.perf_counter() - self.start_time > self.config.timeout_seconds:
             self.timed_out = True
             return False
 
@@ -244,15 +360,22 @@ class ConstraintSolver:
 
         # MRV variable selection
         var_id = self._select_unassigned_variable(unassigned_ids, domains)
-        var_session = self.session_map[var_id]
         var_domain = domains.get(var_id, [])
+
+        if not var_domain:
+            self.backtracks += 1
+            return False
+
+        valid_placements = [p for p in var_domain if self._is_candidate_consistent(p)]
+        if not valid_placements:
+            self.backtracks += 1
+            return False
+
+        ordered_placements = self._order_candidate_placements(var_id, valid_placements, unassigned_ids)
 
         unassigned_ids.remove(var_id)
 
-        for placement in var_domain:
-            if not self._is_candidate_consistent(placement):
-                continue
-
+        for placement in ordered_placements:
             # Assign placement
             self._apply_placement(placement)
             assignments[var_id] = placement
@@ -326,25 +449,25 @@ class ConstraintSolver:
             shares_section = (other_sess.section_id == assigned_sec)
             shares_faculty = (other_sess.faculty_id == assigned_fac)
 
-            # If no possible resource conflict between these two sessions, domain remains unchanged
-            # (unless they share rooms, which depends on individual placement room_id)
-            filtered_candidates = []
-            for cand in other_domain:
-                cand_slots = set(cand.slot_ids)
-                slot_overlap = cand_slots.intersection(assigned_slots)
+            # Fast path: If not sharing section or faculty, only placements using assigned_room at overlapping slots are affected
+            if not shares_section and not shares_faculty:
+                filtered_candidates = []
+                for cand in other_domain:
+                    if cand.room_id == assigned_room and any(s in assigned_slots for s in cand.slot_ids):
+                        continue
+                    filtered_candidates.append(cand)
+            else:
+                filtered_candidates = []
+                fac_data = self.context.faculty.get(other_sess.faculty_id) if shares_faculty else None
+                for cand in other_domain:
+                    cand_slots = cand.slot_ids
+                    # Overlap check
+                    if any(s in assigned_slots for s in cand_slots):
+                        if shares_section or shares_faculty or cand.room_id == assigned_room:
+                            continue
 
-                if slot_overlap:
-                    if shares_section:
-                        continue
-                    if shares_faculty:
-                        continue
-                    if cand.room_id == assigned_room:
-                        continue
-
-                # Also verify against workload limits if sharing faculty
-                if shares_faculty:
-                    fac_data = self.context.faculty.get(other_sess.faculty_id)
-                    if fac_data:
+                    # Faculty workload checks
+                    if shares_faculty and fac_data:
                         cur_day = self.faculty_daily_load.get((other_sess.faculty_id, cand.day_of_week), 0)
                         if cur_day + len(cand.slot_ids) > fac_data.max_daily_periods:
                             continue
@@ -352,12 +475,13 @@ class ConstraintSolver:
                         if cur_week + len(cand.slot_ids) > fac_data.max_weekly_periods:
                             continue
 
-                filtered_candidates.append(cand)
+                    filtered_candidates.append(cand)
 
             if not filtered_candidates:
-                # Domain wipeout!
+                # Immediate domain wipeout
                 return new_domains, True
 
             new_domains[other_id] = filtered_candidates
 
         return new_domains, False
+

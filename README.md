@@ -245,14 +245,14 @@ The application will be accessible at `http://localhost:5173/`.
 ```bash
 cd backend
 .\venv\Scripts\pytest
-# (71 tests passing covering models, constraints, auth, academics, faculty, rooms, CSP engine, manual editing, revisions, PDF export, reports, and role security)
+# (76 tests passing covering models, constraints, auth, academics, faculty, rooms, CSP engine, manual editing, revisions, PDF export, reports, search limits, and role security)
 ```
 
 ### Frontend Tests (Vitest)
 ```bash
 cd frontend
 npx vitest run
-# (23 tests passing covering auth, routing, availability grid, subject allocation, generation wizard, and personal schedule view)
+# (24 tests passing covering auth, routing, availability grid, subject allocation, generation wizard, search limit warnings, and personal schedule view)
 ```
 
 ---

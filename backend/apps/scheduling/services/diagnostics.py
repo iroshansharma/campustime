@@ -105,6 +105,18 @@ class ConflictDiagnosticsService:
                             suggested_action="Increase faculty max weekly teaching periods."
                         ))
 
+            elif len(domain) <= 2:
+                # Highly constrained session warning
+                bottlenecks.append(DiagnosticBottleneck(
+                    category="TIGHT_SEARCH_DOMAIN",
+                    summary=(
+                        f"Session '{sess.session_id}' ({sess.subject_code}) has only {len(domain)} legal candidate placement(s). "
+                        f"Severe candidate restrictions increase backtrack search depth."
+                    ),
+                    affected_entity=f"Session {sess.subject_code} (Section {section.name if section else sess.section_id})",
+                    suggested_action="Expand faculty availability or add matching room options."
+                ))
+
         # 2. Check overall section period saturation
         for sec_id, sec_data in context.sections.items():
             req_periods = sum(r.weekly_periods for r in context.requirements if r.section_id == sec_id)
@@ -121,6 +133,23 @@ class ConflictDiagnosticsService:
                     ),
                     affected_entity=f"Section {sec_data.name}",
                     suggested_action="Add working days or periods, or reduce weekly subject allocations."
+                ))
+
+        # 3. Check faculty aggregate weekly workload oversubscription
+        for fac_id, fac_data in context.faculty.items():
+            req_periods = sum(r.weekly_periods for r in context.requirements if r.faculty_id == fac_id)
+            locked_periods = sum(1 for e in context.locked_entries if e.faculty_id == fac_id)
+            total_needed = req_periods + locked_periods
+            if total_needed > fac_data.max_weekly_periods:
+                bottlenecks.append(DiagnosticBottleneck(
+                    category="WORKLOAD_LIMIT",
+                    summary=(
+                        f"Faculty '{fac_data.name}' requires {total_needed} weekly periods "
+                        f"({req_periods} required + {locked_periods} locked), exceeding their maximum "
+                        f"weekly limit of {fac_data.max_weekly_periods} periods."
+                    ),
+                    affected_entity=f"Faculty {fac_data.name}",
+                    suggested_action="Reduce faculty subject allocations or increase their max weekly teaching periods."
                 ))
 
         return bottlenecks
