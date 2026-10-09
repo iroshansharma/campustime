@@ -121,6 +121,66 @@ The REST API will be available at `http://127.0.0.1:8000/api/v1/`.
 
 ---
 
+## REST API Reference (`/api/v1/`)
+
+Interactive Swagger UI documentation is available at:
+```text
+http://127.0.0.1:8000/api/v1/schema/swagger-ui/
+```
+OpenAPI 3 schema definition:
+```text
+http://127.0.0.1:8000/api/v1/schema/?format=json
+```
+
+### Authentication Endpoints
+| Method | Endpoint | Description | Access |
+|---|---|---|---|
+| `POST` | `/api/v1/auth/token/` | Obtain access & refresh JWT tokens + user profile | Public |
+| `POST` | `/api/v1/auth/token/refresh/` | Refresh expired access token | Public |
+| `GET` | `/api/v1/auth/me/` | Fetch authenticated user's role & linked profiles | Authenticated (`Bearer <token>`) |
+
+#### Example Login Request:
+```bash
+curl -X POST http://127.0.0.1:8000/api/v1/auth/token/ \
+  -H "Content-Type: application/json" \
+  -d '{"username": "admin", "password": "AdminPass@123"}'
+```
+
+#### Example Token Response:
+```json
+{
+  "access": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "refresh": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "user": {
+    "id": 1,
+    "username": "admin",
+    "email": "admin@campustime.local",
+    "first_name": "Campus",
+    "last_name": "Administrator",
+    "role": "ADMIN",
+    "is_staff": true,
+    "faculty_profile": null,
+    "student_profile": null
+  }
+}
+```
+
+### Academic Management Endpoints
+All modifying requests (`POST`, `PUT`, `PATCH`, `DELETE`) require `Role=ADMIN`. `GET` is accessible to authenticated Faculty and Students.
+
+| Endpoint | Supported Operations | Query Filters |
+|---|---|---|
+| `/api/v1/academics/colleges/` | `GET`, `POST`, `PUT`, `PATCH`, `DELETE` | `search` |
+| `/api/v1/academics/academic-years/` | `GET`, `POST`, `PUT`, `PATCH`, `DELETE` | `?college=<id>&is_current=true` |
+| `/api/v1/academics/shifts/` | `GET`, `POST`, `PUT`, `PATCH`, `DELETE` | `?college=<id>&is_active=true` |
+| `/api/v1/academics/working-days/` | `GET`, `POST`, `PUT`, `PATCH`, `DELETE` | `?college=<id>&is_active=true` |
+| `/api/v1/academics/period-slots/` | `GET`, `POST`, `PUT`, `PATCH`, `DELETE` | `?shift=<id>&day_of_week=MON&is_break=false` |
+| `/api/v1/academics/departments/` | `GET`, `POST`, `PUT`, `PATCH`, `DELETE` | `?college=<id>&is_active=true` |
+| `/api/v1/academics/semesters/` | `GET`, `POST`, `PUT`, `PATCH`, `DELETE` | `?academic_year=<id>&department=<id>&shift=<id>` |
+| `/api/v1/academics/sections/` | `GET`, `POST`, `PUT`, `PATCH`, `DELETE` | `?semester=<id>&department=<id>` |
+| `/api/v1/academics/subjects/` | `GET`, `POST`, `PUT`, `PATCH`, `DELETE` | `?department=<id>&subject_type=THEORY` |
+
+
 ### 3. Frontend Setup
 
 ```bash
