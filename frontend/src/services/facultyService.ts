@@ -2,7 +2,7 @@ import { apiClient } from './api';
 import {
   Faculty, FacultySubjectQualification, FacultyAvailability,
   BatchAvailabilityUpdatePayload, SectionSubjectAssignment,
-  FacultyWorkloadSummary, PaginatedResponse
+  FacultyWorkloadSummary, PaginatedResponse, CreateFacultyPayload
 } from '../types';
 
 function extractData<T>(res: { data: PaginatedResponse<T> | T[] }): T[] {
@@ -29,7 +29,7 @@ export const facultyService = {
     return data;
   },
 
-  async createFaculty(payload: Partial<Faculty>): Promise<Faculty> {
+  async createFaculty(payload: CreateFacultyPayload | Partial<Faculty>): Promise<Faculty> {
     const { data } = await apiClient.post<Faculty>('/faculty/profiles/', payload);
     return data;
   },

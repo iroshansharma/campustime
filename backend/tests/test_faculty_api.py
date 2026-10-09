@@ -196,6 +196,88 @@ class TestFacultyAndAllocationAPI:
         })
         assert res.status_code == status.HTTP_403_FORBIDDEN
 
+    def test_faculty_create_admin_success(self, setup_data):
+        client = setup_data['client']
+        client.force_authenticate(user=setup_data['admin_user'])
+
+        payload = {
+            'first_name': 'Claude',
+            'last_name': 'Shannon',
+            'email': 'shannon@test.com',
+            'username': 'c_shannon',
+            'password': 'ShannonSecurePass@123',
+            'employee_id': 'EMP_SHANNON_01',
+            'department': setup_data['dept_cs'].id,
+            'designation': Faculty.Designation.PROFESSOR,
+            'max_daily_periods': 3,
+            'max_weekly_periods': 14,
+            'is_active': True,
+        }
+
+        res = client.post('/api/v1/faculty/profiles/', payload)
+        assert res.status_code == status.HTTP_201_CREATED
+        assert res.data['employee_id'] == 'EMP_SHANNON_01'
+        assert res.data['max_daily_periods'] == 3
+        assert res.data['max_weekly_periods'] == 14
+        assert res.data['user_details']['first_name'] == 'Claude'
+        assert res.data['user_details']['last_name'] == 'Shannon'
+        assert res.data['user_details']['email'] == 'shannon@test.com'
+        assert 'password' not in res.data
+
+        # Verify User model in DB
+        created_user = User.objects.get(email='shannon@test.com')
+        assert created_user.username == 'c_shannon'
+        assert created_user.role == User.Role.FACULTY
+        assert created_user.check_password('ShannonSecurePass@123')
+
+        # Verify Faculty model in DB
+        faculty_record = Faculty.objects.get(employee_id='EMP_SHANNON_01')
+        assert faculty_record.user == created_user
+        assert faculty_record.department == setup_data['dept_cs']
+
+    def test_faculty_create_validation_duplicate_email_and_employee(self, setup_data):
+        client = setup_data['client']
+        client.force_authenticate(user=setup_data['admin_user'])
+
+        # Duplicate email
+        res = client.post('/api/v1/faculty/profiles/', {
+            'first_name': 'Duplicate',
+            'last_name': 'Email',
+            'email': 'fac1@test.com',  # existing user email
+            'employee_id': 'EMP_NEW_99',
+            'department': setup_data['dept_cs'].id,
+        })
+        assert res.status_code == status.HTTP_400_BAD_REQUEST
+        assert 'email' in res.data
+
+        # Duplicate employee_id
+        res = client.post('/api/v1/faculty/profiles/', {
+            'first_name': 'Duplicate',
+            'last_name': 'Employee',
+            'email': 'new_emp@test.com',
+            'employee_id': 'EMP001',  # existing employee_id
+            'department': setup_data['dept_cs'].id,
+        })
+        assert res.status_code == status.HTTP_400_BAD_REQUEST
+        assert 'employee_id' in res.data
+
+    def test_faculty_create_validation_workload_mismatch(self, setup_data):
+        client = setup_data['client']
+        client.force_authenticate(user=setup_data['admin_user'])
+
+        # max_daily > max_weekly
+        res = client.post('/api/v1/faculty/profiles/', {
+            'first_name': 'Invalid',
+            'last_name': 'Workload',
+            'email': 'invalid_workload@test.com',
+            'employee_id': 'EMP_INV_01',
+            'department': setup_data['dept_cs'].id,
+            'max_daily_periods': 5,
+            'max_weekly_periods': 3,
+        })
+        assert res.status_code == status.HTTP_400_BAD_REQUEST
+        assert 'max_daily_periods' in res.data
+
     def test_faculty_workload_detail_endpoint(self, setup_data):
         client = setup_data['client']
         client.force_authenticate(user=setup_data['admin_user'])

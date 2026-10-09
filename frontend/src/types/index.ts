@@ -158,6 +158,27 @@ export interface PaginatedResponse<T> {
   results: T[];
 }
 
+export type FacultyDesignation =
+  | 'PROFESSOR'
+  | 'ASSOCIATE_PROF'
+  | 'ASSISTANT_PROF'
+  | 'LECTURER'
+  | 'GUEST_FACULTY';
+
+export interface CreateFacultyPayload {
+  first_name: string;
+  last_name?: string;
+  email: string;
+  username?: string;
+  password?: string;
+  employee_id: string;
+  department: number;
+  designation: string;
+  max_weekly_periods?: number;
+  max_daily_periods?: number;
+  is_active?: boolean;
+}
+
 export interface Faculty {
   id: number;
   user: number;

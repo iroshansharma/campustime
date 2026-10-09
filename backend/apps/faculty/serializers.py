@@ -16,11 +16,21 @@ class FacultyUserSummarySerializer(serializers.ModelSerializer):
 
 
 class FacultySerializer(serializers.ModelSerializer):
+    user = serializers.PrimaryKeyRelatedField(
+        queryset=User.objects.all(), required=False, allow_null=True
+    )
     user_details = FacultyUserSummarySerializer(source='user', read_only=True)
     department_name = serializers.CharField(source='department.name', read_only=True)
     department_code = serializers.CharField(source='department.code', read_only=True)
     designation_display = serializers.CharField(source='get_designation_display', read_only=True)
     current_weekly_load = serializers.SerializerMethodField(read_only=True)
+
+    # User creation and update fields (write-only)
+    first_name = serializers.CharField(write_only=True, required=False, allow_blank=True)
+    last_name = serializers.CharField(write_only=True, required=False, allow_blank=True)
+    email = serializers.EmailField(write_only=True, required=False)
+    username = serializers.CharField(write_only=True, required=False, max_length=150)
+    password = serializers.CharField(write_only=True, required=False, min_length=6)
 
     class Meta:
         model = Faculty
@@ -29,7 +39,8 @@ class FacultySerializer(serializers.ModelSerializer):
             'department', 'department_name', 'department_code',
             'designation', 'designation_display',
             'max_weekly_periods', 'max_daily_periods',
-            'is_active', 'current_weekly_load'
+            'is_active', 'current_weekly_load',
+            'first_name', 'last_name', 'email', 'username', 'password'
         ]
 
     @extend_schema_field(serializers.IntegerField())
@@ -40,6 +51,41 @@ class FacultySerializer(serializers.ModelSerializer):
         )
 
     def validate(self, attrs):
+        user = attrs.get('user')
+        email = attrs.get('email')
+        username = attrs.get('username')
+
+        if self.instance is None:
+            # Creating a new faculty profile
+            if user:
+                if hasattr(user, 'faculty_profile'):
+                    raise serializers.ValidationError({
+                        'user': 'A faculty profile already exists for this user account.'
+                    })
+            else:
+                if not email:
+                    raise serializers.ValidationError({
+                        'email': 'Email is required to create a new faculty user account.'
+                    })
+                if User.objects.filter(email__iexact=email.strip()).exists():
+                    raise serializers.ValidationError({
+                        'email': 'A user account with this email address already exists.'
+                    })
+                if username and User.objects.filter(username__iexact=username.strip()).exists():
+                    raise serializers.ValidationError({
+                        'username': 'A user account with this username already exists.'
+                    })
+        else:
+            # Updating existing faculty profile
+            if email and User.objects.filter(email__iexact=email.strip()).exclude(pk=self.instance.user_id).exists():
+                raise serializers.ValidationError({
+                    'email': 'A user account with this email address already exists.'
+                })
+            if username and User.objects.filter(username__iexact=username.strip()).exclude(pk=self.instance.user_id).exists():
+                raise serializers.ValidationError({
+                    'username': 'A user account with this username already exists.'
+                })
+
         max_daily = attrs.get('max_daily_periods') or (self.instance.max_daily_periods if self.instance else None)
         max_weekly = attrs.get('max_weekly_periods') or (self.instance.max_weekly_periods if self.instance else None)
 
@@ -48,6 +94,79 @@ class FacultySerializer(serializers.ModelSerializer):
                 'max_daily_periods': 'Maximum daily periods cannot exceed maximum weekly periods.'
             })
         return attrs
+
+    @transaction.atomic
+    def create(self, validated_data):
+        user = validated_data.pop('user', None)
+        first_name = validated_data.pop('first_name', '').strip()
+        last_name = validated_data.pop('last_name', '').strip()
+        email = validated_data.pop('email', None)
+        username = validated_data.pop('username', None)
+        password = validated_data.pop('password', None)
+
+        if not user:
+            if not email:
+                raise serializers.ValidationError({'email': 'Email is required to create a faculty account.'})
+
+            if not username:
+                base_uname = email.split('@')[0].strip().lower()
+                candidate = base_uname
+                counter = 1
+                while User.objects.filter(username__iexact=candidate).exists():
+                    candidate = f"{base_uname}{counter}"
+                    counter += 1
+                username = candidate
+
+            if not password:
+                password = 'FacultyPassword@123'
+
+            user = User.objects.create_user(
+                username=username,
+                email=email.strip(),
+                first_name=first_name,
+                last_name=last_name,
+                password=password,
+                role=User.Role.FACULTY
+            )
+        elif user.role != User.Role.FACULTY:
+            user.role = User.Role.FACULTY
+            user.save(update_fields=['role'])
+
+        faculty = Faculty.objects.create(user=user, **validated_data)
+        return faculty
+
+    @transaction.atomic
+    def update(self, instance, validated_data):
+        first_name = validated_data.pop('first_name', None)
+        last_name = validated_data.pop('last_name', None)
+        email = validated_data.pop('email', None)
+        username = validated_data.pop('username', None)
+        password = validated_data.pop('password', None)
+
+        user = instance.user
+        user_changed = False
+        if first_name is not None:
+            user.first_name = first_name.strip()
+            user_changed = True
+        if last_name is not None:
+            user.last_name = last_name.strip()
+            user_changed = True
+        if email is not None:
+            user.email = email.strip()
+            user_changed = True
+        if username is not None:
+            user.username = username.strip()
+            user_changed = True
+        if password:
+            user.set_password(password)
+            user_changed = True
+        if user_changed:
+            user.save()
+
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+        return instance
 
 
 class FacultySubjectQualificationSerializer(serializers.ModelSerializer):
