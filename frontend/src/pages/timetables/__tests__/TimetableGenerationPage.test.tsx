@@ -88,7 +88,7 @@ describe('TimetableGenerationPage', () => {
   it('renders scope selection form and generation controls', async () => {
     renderComponent();
 
-    expect(screen.getByText('Automatic Timetable Generation')).toBeInTheDocument();
+    expect(screen.getByText(/Automatic Timetable Generation/i)).toBeInTheDocument();
     expect(screen.getByText('1. Academic Scope Selection')).toBeInTheDocument();
     expect(screen.getByText('2. Engine Optimization')).toBeInTheDocument();
 

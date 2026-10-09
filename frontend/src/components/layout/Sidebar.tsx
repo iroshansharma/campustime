@@ -46,6 +46,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   const facultyNav = [
     { label: 'Dashboard', to: '/dashboard', icon: LayoutDashboard },
+    { label: 'My Schedule', to: '/my-schedule', icon: CalendarDays },
     { label: 'Timetables', to: '/timetables', icon: CalendarRange },
     { label: 'My Availability', to: '/faculty/availability', icon: CalendarDays },
     { label: 'Workload Overview', to: '/faculty/workload', icon: Layers },
@@ -55,6 +56,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   const studentNav = [
     { label: 'Dashboard', to: '/dashboard', icon: LayoutDashboard },
+    { label: 'My Schedule', to: '/my-schedule', icon: CalendarDays },
     { label: 'Timetables', to: '/timetables', icon: CalendarRange },
     { label: 'My Section', to: '/academics/sections', icon: Users },
     { label: 'Subjects', to: '/academics/subjects', icon: BookOpen },

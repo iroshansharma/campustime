@@ -3,12 +3,15 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Sparkles, AlertCircle, CheckCircle2, Clock,
   Layers, ShieldCheck, Lock, Unlock,
-  RefreshCw, Send, AlertTriangle
+  RefreshCw, Send, AlertTriangle, Download,
+  BarChart3, GitFork, Edit3
 } from 'lucide-react';
 import { academicsService } from '../../services/academicsService';
 import { timetableService } from '../../services/timetableService';
+import { roomsService } from '../../services/roomsService';
 import { Button } from '../../components/common/Button';
 import { Badge } from '../../components/common/Badge';
+import { Modal } from '../../components/common/Modal';
 import {
   GenerateSchedulePayload,
   GenerationResult,
@@ -16,6 +19,7 @@ import {
   TimetableEntry,
   ValidationReport,
   DayCode,
+  Room,
 } from '../../types';
 
 export const TimetableGenerationPage: React.FC = () => {
@@ -39,6 +43,22 @@ export const TimetableGenerationPage: React.FC = () => {
   const [activeTimetableId, setActiveTimetableId] = useState<number | null>(null);
   const [filterSectionId, setFilterSectionId] = useState<number | ''>('');
   const [validationReport, setValidationReport] = useState<ValidationReport | null>(null);
+
+  // Manual Edit Modal State
+  const [editingEntry, setEditingEntry] = useState<TimetableEntry | null>(null);
+  const [targetSlotId, setTargetSlotId] = useState<number | ''>('');
+  const [targetRoomId, setTargetRoomId] = useState<number | ''>('');
+  const [editError, setEditError] = useState<string | null>(null);
+
+  // PDF Export Modal State
+  const [isPdfModalOpen, setIsPdfModalOpen] = useState<boolean>(false);
+  const [pdfType, setPdfType] = useState<'section' | 'faculty' | 'room'>('section');
+  const [pdfSectionId, setPdfSectionId] = useState<number | ''>('');
+  const [isExportingPdf, setIsExportingPdf] = useState<boolean>(false);
+
+  // Reports Modal State
+  const [isReportsModalOpen, setIsReportsModalOpen] = useState<boolean>(false);
+  const [reportsTab, setReportsTab] = useState<'workload' | 'rooms'>('workload');
 
   // Scope Data Queries
   const { data: academicYears = [] } = useQuery({
@@ -71,6 +91,11 @@ export const TimetableGenerationPage: React.FC = () => {
     enabled: !!semesterId,
   });
 
+  const { data: rooms = [] } = useQuery<Room[]>({
+    queryKey: ['rooms'],
+    queryFn: () => roomsService.getRooms(),
+  });
+
   // Active Timetable Details & Entries
   const { data: activeTimetable, refetch: refetchTimetable } = useQuery<Timetable>({
     queryKey: ['timetable', activeTimetableId],
@@ -85,6 +110,19 @@ export const TimetableGenerationPage: React.FC = () => {
       filterSectionId ? { section: Number(filterSectionId) } : undefined
     ),
     enabled: !!activeTimetableId,
+  });
+
+  // Reports Queries
+  const { data: workloadReport = [] } = useQuery({
+    queryKey: ['report-workload', activeTimetableId],
+    queryFn: () => timetableService.getWorkloadReport(activeTimetableId!),
+    enabled: !!activeTimetableId && isReportsModalOpen,
+  });
+
+  const { data: roomReport = [] } = useQuery({
+    queryKey: ['report-rooms', activeTimetableId],
+    queryFn: () => timetableService.getRoomUtilizationReport(activeTimetableId!),
+    enabled: !!activeTimetableId && isReportsModalOpen,
   });
 
   // Period slots for grid display
@@ -148,6 +186,41 @@ export const TimetableGenerationPage: React.FC = () => {
     },
   });
 
+  // Create Revision Mutation
+  const createRevisionMutation = useMutation({
+    mutationFn: (id: number) => timetableService.createRevision(id),
+    onSuccess: (newTt) => {
+      setActiveTimetableId(newTt.id);
+      refetchTimetable();
+      refetchEntries();
+      queryClient.invalidateQueries({ queryKey: ['timetables'] });
+    },
+  });
+
+  // Move / Manual Edit Mutation
+  const moveEntryMutation = useMutation({
+    mutationFn: async ({ entryId, payload }: { entryId: number; payload: any }) => {
+      return timetableService.moveEntry(entryId, payload);
+    },
+    onSuccess: () => {
+      setEditingEntry(null);
+      setEditError(null);
+      refetchEntries();
+      refetchTimetable();
+      queryClient.invalidateQueries({ queryKey: ['timetables'] });
+    },
+    onError: (error: any) => {
+      const err = error.response?.data;
+      if (err?.message) {
+        setEditError(`${err.conflict_code || 'ERROR'}: ${err.message} ${err.suggested_action ? `(${err.suggested_action})` : ''}`);
+      } else if (err?.detail) {
+        setEditError(err.detail);
+      } else {
+        setEditError('Failed to move class session.');
+      }
+    },
+  });
+
   // Lock/Unlock Entry Mutation
   const toggleLockMutation = useMutation({
     mutationFn: async ({ entryId, isLocked }: { entryId: number; isLocked: boolean }) => {
@@ -181,6 +254,48 @@ export const TimetableGenerationPage: React.FC = () => {
     generateMutation.mutate(payload);
   };
 
+  const handleExportPdf = async () => {
+    if (!activeTimetable) return;
+    setIsExportingPdf(true);
+    try {
+      const blob = await timetableService.exportPdf(activeTimetable.id, {
+        type: pdfType,
+        section_id: pdfSectionId ? Number(pdfSectionId) : undefined,
+      });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `${activeTimetable.name}_${pdfType}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+      setIsPdfModalOpen(false);
+    } catch (err) {
+      console.error('Failed to export PDF:', err);
+    } finally {
+      setIsExportingPdf(false);
+    }
+  };
+
+  const handleOpenEditModal = (entry: TimetableEntry) => {
+    setEditingEntry(entry);
+    setTargetSlotId(entry.period_slot);
+    setTargetRoomId(entry.room);
+    setEditError(null);
+  };
+
+  const handleSaveMove = () => {
+    if (!editingEntry || !targetSlotId) return;
+    moveEntryMutation.mutate({
+      entryId: editingEntry.id,
+      payload: {
+        period_slot_id: Number(targetSlotId),
+        room_id: targetRoomId ? Number(targetRoomId) : undefined,
+      },
+    });
+  };
+
   // Build grid data: Days and unique periods
   const days: DayCode[] = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
   const uniquePeriodNumbers = Array.from(
@@ -194,10 +309,10 @@ export const TimetableGenerationPage: React.FC = () => {
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-slate-900 flex items-center gap-2">
             <Sparkles className="h-6 w-6 text-brand-600" />
-            Automatic Timetable Generation
+            Automatic Timetable Generation & Editor
           </h1>
           <p className="text-sm text-slate-500 mt-1">
-            Constraint satisfaction engine (MRV + Forward Checking) with independent validation & diagnostics.
+            Constraint satisfaction engine (MRV + Forward Checking), interactive slot editing & publication.
           </p>
         </div>
       </div>
@@ -557,7 +672,7 @@ export const TimetableGenerationPage: React.FC = () => {
               </p>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <Button
                 variant="outline"
                 size="sm"
@@ -566,10 +681,41 @@ export const TimetableGenerationPage: React.FC = () => {
                 className="gap-1 text-xs"
               >
                 <ShieldCheck className="h-3.5 w-3.5 text-brand-600" />
-                Validate Draft
+                Validate
               </Button>
 
-              {activeTimetable.status !== 'PUBLISHED' && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setIsReportsModalOpen(true)}
+                className="gap-1 text-xs"
+              >
+                <BarChart3 className="h-3.5 w-3.5 text-slate-600" />
+                Reports
+              </Button>
+
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setIsPdfModalOpen(true)}
+                className="gap-1 text-xs"
+              >
+                <Download className="h-3.5 w-3.5 text-slate-600" />
+                Export PDF
+              </Button>
+
+              {activeTimetable.status === 'PUBLISHED' ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => createRevisionMutation.mutate(activeTimetable.id)}
+                  disabled={createRevisionMutation.isPending}
+                  className="gap-1 text-xs font-semibold text-brand-700 bg-brand-50 border-brand-200"
+                >
+                  <GitFork className="h-3.5 w-3.5" />
+                  Fork Revision Draft
+                </Button>
+              ) : (
                 <Button
                   variant="primary"
                   size="sm"
@@ -686,12 +832,13 @@ export const TimetableGenerationPage: React.FC = () => {
                                   )}
                                   <button
                                     title={entry.is_locked ? 'Unlock entry' : 'Lock entry'}
-                                    onClick={() =>
+                                    onClick={(e) => {
+                                      e.stopPropagation();
                                       toggleLockMutation.mutate({
                                         entryId: entry.id,
                                         isLocked: entry.is_locked,
-                                      })
-                                    }
+                                      });
+                                    }}
                                     className={`p-0.5 rounded transition-colors ${
                                       entry.is_locked
                                         ? 'text-amber-600 hover:text-amber-700'
@@ -704,6 +851,15 @@ export const TimetableGenerationPage: React.FC = () => {
                                       <Unlock className="h-3 w-3" />
                                     )}
                                   </button>
+                                  {activeTimetable.status !== 'PUBLISHED' && (
+                                    <button
+                                      title="Edit or move session"
+                                      onClick={() => handleOpenEditModal(entry)}
+                                      className="p-0.5 rounded text-slate-400 hover:text-brand-600 transition-colors"
+                                    >
+                                      <Edit3 className="h-3 w-3" />
+                                    </button>
+                                  )}
                                 </div>
                               </div>
                               <span className="text-[11px] text-slate-600 truncate max-w-[130px]">
@@ -726,6 +882,221 @@ export const TimetableGenerationPage: React.FC = () => {
             </table>
           </div>
         </div>
+      )}
+
+      {/* Manual Slot Edit / Move Modal */}
+      {editingEntry && (
+        <Modal
+          isOpen={!!editingEntry}
+          onClose={() => setEditingEntry(null)}
+          title={`Edit Class Slot — ${editingEntry.subject_code}`}
+          description={`Reassign time slot or facility for Section ${editingEntry.section_name}.`}
+        >
+          <div className="space-y-4">
+            {editingEntry.is_locked && (
+              <div className="bg-amber-50 border border-amber-200 text-amber-800 p-2.5 rounded-lg text-xs flex items-center gap-2">
+                <AlertTriangle className="h-4 w-4 shrink-0" />
+                This entry is locked. Unlock it in the grid before reassigning.
+              </div>
+            )}
+
+            {editError && (
+              <div className="bg-rose-50 border border-rose-200 text-rose-800 p-3 rounded-lg text-xs space-y-1">
+                <div className="font-semibold flex items-center gap-1.5">
+                  <AlertCircle className="h-4 w-4 shrink-0" />
+                  Validation Conflict
+                </div>
+                <p className="opacity-95">{editError}</p>
+              </div>
+            )}
+
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
+                  Target Period Slot *
+                </label>
+                <select
+                  aria-label="Target Period Slot"
+                  value={targetSlotId}
+                  onChange={(e) => setTargetSlotId(Number(e.target.value))}
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500 bg-white"
+                >
+                  {periodSlots
+                    .filter((s) => !s.is_break)
+                    .map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.day_of_week} • Period {s.period_number} ({s.start_time.slice(0, 5)} - {s.end_time.slice(0, 5)})
+                      </option>
+                    ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
+                  Assigned Room
+                </label>
+                <select
+                  aria-label="Assigned Room"
+                  value={targetRoomId}
+                  onChange={(e) => setTargetRoomId(Number(e.target.value))}
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500 bg-white"
+                >
+                  {rooms.map((r) => (
+                    <option key={r.id} value={r.id}>
+                      {r.code} ({r.name}) • Cap {r.capacity} • {r.room_type}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
+              <Button variant="outline" size="sm" onClick={() => setEditingEntry(null)}>
+                Cancel
+              </Button>
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={handleSaveMove}
+                disabled={moveEntryMutation.isPending || editingEntry.is_locked}
+              >
+                {moveEntryMutation.isPending ? 'Saving...' : 'Apply Move'}
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* PDF Export Modal */}
+      {isPdfModalOpen && activeTimetable && (
+        <Modal
+          isOpen={isPdfModalOpen}
+          onClose={() => setIsPdfModalOpen(false)}
+          title="Export Timetable as PDF"
+          description="Generate official collegiate printable schedule in landscape format."
+        >
+          <div className="space-y-4">
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
+                Schedule View
+              </label>
+              <select
+                aria-label="Schedule View"
+                value={pdfType}
+                onChange={(e) => setPdfType(e.target.value as any)}
+                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500 bg-white"
+              >
+                <option value="section">Section Timetable</option>
+                <option value="faculty">Faculty Teaching Schedule</option>
+                <option value="room">Room Utilization Schedule</option>
+              </select>
+            </div>
+
+            {pdfType === 'section' && sections.length > 0 && (
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
+                  Target Section
+                </label>
+                <select
+                  aria-label="Target Section"
+                  value={pdfSectionId}
+                  onChange={(e) => setPdfSectionId(Number(e.target.value))}
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500 bg-white"
+                >
+                  <option value="">Default (First Active Section)</option>
+                  {sections.map((sec) => (
+                    <option key={sec.id} value={sec.id}>
+                      {sec.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
+              <Button variant="outline" size="sm" onClick={() => setIsPdfModalOpen(false)}>
+                Cancel
+              </Button>
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={handleExportPdf}
+                disabled={isExportingPdf}
+                className="gap-1"
+              >
+                <Download className="h-3.5 w-3.5" />
+                {isExportingPdf ? 'Exporting...' : 'Download PDF'}
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* Reports & Analytics Modal */}
+      {isReportsModalOpen && activeTimetable && (
+        <Modal
+          isOpen={isReportsModalOpen}
+          onClose={() => setIsReportsModalOpen(false)}
+          title={`Reports & Analytics — ${activeTimetable.name}`}
+          maxWidth="max-w-2xl"
+        >
+          <div className="space-y-4">
+            <div className="flex border-b border-slate-200">
+              <button
+                onClick={() => setReportsTab('workload')}
+                className={`px-4 py-2 text-xs font-semibold border-b-2 transition-colors ${
+                  reportsTab === 'workload'
+                    ? 'border-brand-600 text-brand-600'
+                    : 'border-transparent text-slate-500 hover:text-slate-700'
+                }`}
+              >
+                Faculty Workload ({workloadReport.length})
+              </button>
+              <button
+                onClick={() => setReportsTab('rooms')}
+                className={`px-4 py-2 text-xs font-semibold border-b-2 transition-colors ${
+                  reportsTab === 'rooms'
+                    ? 'border-brand-600 text-brand-600'
+                    : 'border-transparent text-slate-500 hover:text-slate-700'
+                }`}
+              >
+                Room Utilization ({roomReport.length})
+              </button>
+            </div>
+
+            {reportsTab === 'workload' ? (
+              <div className="max-h-80 overflow-y-auto space-y-2">
+                {workloadReport.map((f: any) => (
+                  <div key={f.faculty_id} className="p-3 bg-slate-50 rounded-lg border border-slate-200 text-xs flex items-center justify-between">
+                    <div>
+                      <div className="font-bold text-slate-900">{f.faculty_name}</div>
+                      <div className="text-slate-500 text-[11px]">{f.employee_id} • {f.department_code}</div>
+                    </div>
+                    <div className="text-right">
+                      <div className="font-bold text-brand-700">{f.assigned_periods} / {f.max_weekly_periods} periods</div>
+                      <div className="text-slate-400 text-[11px]">{f.utilization_pct}% utilization</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="max-h-80 overflow-y-auto space-y-2">
+                {roomReport.map((r: any) => (
+                  <div key={r.room_id} className="p-3 bg-slate-50 rounded-lg border border-slate-200 text-xs flex items-center justify-between">
+                    <div>
+                      <div className="font-bold text-slate-900">{r.room_code} ({r.room_name})</div>
+                      <div className="text-slate-500 text-[11px]">{r.room_type} • Cap {r.capacity}</div>
+                    </div>
+                    <div className="text-right">
+                      <div className="font-bold text-brand-700">{r.booked_slots} booked</div>
+                      <div className="text-slate-400 text-[11px]">{r.utilization_pct}% utilization</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </Modal>
       )}
     </div>
   );

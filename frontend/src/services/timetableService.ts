@@ -56,4 +56,48 @@ export const timetableService = {
     const res = await apiClient.post<TimetableEntry>(`/timetables/entry-records/${entryId}/unlock/`);
     return res.data;
   },
+
+  moveEntry: async (
+    entryId: number,
+    payload: { period_slot_id: number; room_id?: number; faculty_id?: number }
+  ): Promise<TimetableEntry> => {
+    const res = await apiClient.post<TimetableEntry>(`/timetables/entry-records/${entryId}/move/`, payload);
+    return res.data;
+  },
+
+  createRevision: async (id: number): Promise<Timetable> => {
+    const res = await apiClient.post<Timetable>(`/timetables/${id}/create-revision/`);
+    return res.data;
+  },
+
+  getMySchedule: async (): Promise<any> => {
+    const res = await apiClient.get('/timetables/my-schedule/');
+    return res.data;
+  },
+
+  exportPdf: async (
+    id: number,
+    params: { type: 'section' | 'faculty' | 'room'; section_id?: number; faculty_id?: number; room_id?: number }
+  ): Promise<Blob> => {
+    const res = await apiClient.get(`/timetables/${id}/export-pdf/`, {
+      params,
+      responseType: 'blob',
+    });
+    return res.data;
+  },
+
+  getWorkloadReport: async (id: number): Promise<any[]> => {
+    const res = await apiClient.get(`/timetables/${id}/reports/workload/`);
+    return res.data;
+  },
+
+  getRoomUtilizationReport: async (id: number): Promise<any[]> => {
+    const res = await apiClient.get(`/timetables/${id}/reports/room-utilization/`);
+    return res.data;
+  },
+
+  getSummaryReport: async (id: number): Promise<any> => {
+    const res = await apiClient.get(`/timetables/${id}/reports/summary/`);
+    return res.data;
+  },
 };

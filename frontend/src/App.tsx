@@ -30,6 +30,7 @@ import { FacultyWorkloadPage } from './pages/faculty/FacultyWorkloadPage';
 import { RoomsPage } from './pages/rooms/RoomsPage';
 import { TimetableGenerationPage } from './pages/timetables/TimetableGenerationPage';
 import { TimetableListPage } from './pages/timetables/TimetableListPage';
+import { MySchedulePage } from './pages/timetables/MySchedulePage';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -76,6 +77,7 @@ export const App: React.FC = () => {
               {/* Automatic Timetable Generation & Management */}
               <Route path="timetables" element={<TimetableListPage />} />
               <Route path="timetables/generate" element={<TimetableGenerationPage />} />
+              <Route path="my-schedule" element={<MySchedulePage />} />
 
               {/* Academic Setup Pages */}
               <Route path="academics/colleges" element={<CollegesPage />} />

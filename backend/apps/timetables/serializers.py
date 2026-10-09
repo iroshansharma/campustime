@@ -134,3 +134,49 @@ class GenerationResultSerializer(serializers.Serializer):
     nodes_explored = serializers.IntegerField()
     validation_report = ValidationReportSerializer(allow_null=True)
     bottlenecks = DiagnosticBottleneckSerializer(many=True)
+
+
+class MoveEntryRequestSerializer(serializers.Serializer):
+    period_slot_id = serializers.IntegerField(required=True)
+    room_id = serializers.IntegerField(required=False, allow_null=True)
+    faculty_id = serializers.IntegerField(required=False, allow_null=True)
+
+
+class FacultyWorkloadReportSerializer(serializers.Serializer):
+    faculty_id = serializers.IntegerField()
+    faculty_name = serializers.CharField()
+    employee_id = serializers.CharField()
+    department_code = serializers.CharField()
+    max_weekly_periods = serializers.IntegerField()
+    max_daily_periods = serializers.IntegerField()
+    assigned_periods = serializers.IntegerField()
+    utilization_pct = serializers.FloatField()
+
+
+class RoomUtilizationReportSerializer(serializers.Serializer):
+    room_id = serializers.IntegerField()
+    room_code = serializers.CharField()
+    room_name = serializers.CharField()
+    room_type = serializers.CharField()
+    capacity = serializers.IntegerField()
+    total_slots_available = serializers.IntegerField()
+    booked_slots = serializers.IntegerField()
+    utilization_pct = serializers.FloatField()
+
+
+class TimetableSummaryReportSerializer(serializers.Serializer):
+    timetable_id = serializers.IntegerField()
+    name = serializers.CharField()
+    status = serializers.CharField()
+    version = serializers.IntegerField()
+    academic_year = serializers.CharField()
+    shift = serializers.CharField()
+    total_entries = serializers.IntegerField()
+    theory_entries = serializers.IntegerField()
+    lab_entries = serializers.IntegerField()
+    sections_count = serializers.IntegerField()
+    faculty_count = serializers.IntegerField()
+    rooms_count = serializers.IntegerField()
+    is_valid = serializers.BooleanField()
+    hard_violations = serializers.IntegerField()
+

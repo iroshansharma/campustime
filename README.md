@@ -198,7 +198,7 @@ Enforces qualifications, workload thresholds, and institution-level isolation. S
 | `/api/v1/rooms/rooms/` | `GET`, `POST`, `PUT`, `PATCH`, `DELETE` | `?department=<id>&room_type=LAB&min_capacity=40` |
 | `/api/v1/rooms/availability/` | `GET`, `POST`, `PUT`, `PATCH`, `DELETE` | `?room=<id>&is_available=true` |
 
-### Timetable Generation & Scheduling Endpoints
+### Timetable Management, Editing, PDF & Reporting Endpoints
 | Endpoint | Supported Operations | Description |
 |---|---|---|
 | `/api/v1/timetables/generate/` | `POST` | Scope-defined automated CSP timetable generation (Admin only) |
@@ -208,6 +208,13 @@ Enforces qualifications, workload thresholds, and institution-level isolation. S
 | `/api/v1/timetables/{id}/conflicts/` | `GET` | Independent constraint validation diagnostics inspection |
 | `/api/v1/timetables/{id}/validate/` | `POST` | Re-validate draft timetable instance server-side |
 | `/api/v1/timetables/{id}/publish/` | `POST` | Validation-gated timetable publication |
+| `/api/v1/timetables/{id}/create-revision/` | `POST` | Fork published timetable into new editable DRAFT revision |
+| `/api/v1/timetables/{id}/export-pdf/` | `GET` | Printable landscape PDF (`?type=section&section_id=<id>`, `type=faculty`, `type=room`) |
+| `/api/v1/timetables/{id}/reports/workload/` | `GET` | Faculty workload utilization report |
+| `/api/v1/timetables/{id}/reports/room-utilization/` | `GET` | Facility capacity and slot utilization report |
+| `/api/v1/timetables/{id}/reports/summary/` | `GET` | Comprehensive curriculum completion & validation report |
+| `/api/v1/timetables/my-schedule/` | `GET` | Role-scoped personal schedule (Student section or Faculty teaching slots) |
+| `/api/v1/timetables/entry-records/{id}/move/` | `POST` | Atomic manual class reassignment with server collision validation |
 | `/api/v1/timetables/entry-records/{id}/lock/` | `POST` | Lock manual slot pin to preserve during regeneration |
 | `/api/v1/timetables/entry-records/{id}/unlock/` | `POST` | Unlock slot allowing generator reallocation |
 
@@ -238,14 +245,14 @@ The application will be accessible at `http://localhost:5173/`.
 ```bash
 cd backend
 .\venv\Scripts\pytest
-# (65 tests passing covering models, constraints, auth, academics, faculty, rooms, CSP engine, validation, and diagnostics)
+# (71 tests passing covering models, constraints, auth, academics, faculty, rooms, CSP engine, manual editing, revisions, PDF export, reports, and role security)
 ```
 
 ### Frontend Tests (Vitest)
 ```bash
 cd frontend
 npx vitest run
-# (20 tests passing covering auth, routing, availability grid, subject allocation, and generation wizard)
+# (23 tests passing covering auth, routing, availability grid, subject allocation, generation wizard, and personal schedule view)
 ```
 
 ---
