@@ -283,11 +283,14 @@ Following **UI/UX Pro Max** guidelines for an academic scheduling command center
 - Build modern responsive layout (Sidebar, Navbar, Notification drawer).
 - Build Admin Dashboard overview with academic metrics and quick actions.
 
-### Phase 5: Faculty Availability & Subject Allocation Modules
-- Faculty profile and qualification management UI + APIs.
-- Interactive Weekly Availability Matrix for faculty members.
-- Section-Subject-Faculty assignment interface with lecture hours tracking.
-- Room and lab capacity management with equipment/lab type tagging.
+### Phase 5: Faculty Availability & Subject Allocation Modules (Completed)
+- [x] Complete authenticated REST APIs under `/api/v1/faculty/` (`profiles`, `qualifications`, `availability`, `batch-update`, `assignments`) and `/api/v1/rooms/` (`rooms`, `availability`).
+- [x] Enforce institutional constraints: subject qualifications, cross-college isolation, break period availability blocking, and teacher max weekly periods capacity.
+- [x] Weekly Faculty Availability Matrix in React with Days × Periods grid, preferred slot differentiation, break period protection, bulk actions (day, period, all), and atomic batch updates.
+- [x] Subject–Teacher–Section Allocation interface with cascading selection, qualified instructor filtering, live capacity forecasting, room feasibility validation, and missing allocation warnings.
+- [x] Faculty Workload Overview & Directory with utilization tracking and assignment breakdowns.
+- [x] Rooms & Laboratories management with capacity filtering and department affinity tagging.
+- [x] 13 new backend pytest tests (55 passing total) and 8 new frontend vitest tests (17 passing total).
 
 ### Phase 6: Automatic Timetable Generator Engine
 - Implement CSP solver (`apps/scheduling/engine.py`):

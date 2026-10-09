@@ -114,6 +114,10 @@ class FacultyAvailability(models.Model):
         default=True,
         help_text='True if faculty is available to teach during this slot.'
     )
+    is_preferred = models.BooleanField(
+        default=False,
+        help_text='True if faculty explicitly prefers teaching during this slot.'
+    )
     reason = models.CharField(max_length=200, blank=True, help_text='e.g., Dept Meeting, Off-Campus Research')
 
     class Meta:
@@ -166,6 +170,38 @@ class SectionSubjectAssignment(models.Model):
                 name='unique_section_subject_faculty_assignment'
             )
         ]
+
+    def clean(self):
+        # 1. Subject qualification check
+        if self.faculty_id and self.subject_id:
+            if not FacultySubjectQualification.objects.filter(faculty=self.faculty, subject=self.subject).exists():
+                raise ValidationError({
+                    'faculty': f"Faculty member '{self.faculty.user.get_full_name() or self.faculty.user.username}' is not qualified to teach '{self.subject.code}'."
+                })
+
+        # 2. Cross-college check
+        if self.section_id and self.faculty_id:
+            section_college_id = self.section.semester.department.college_id
+            faculty_college_id = self.faculty.department.college_id
+            if section_college_id != faculty_college_id:
+                raise ValidationError({
+                    'faculty': f"Faculty belongs to a different institution than Section '{self.section}'."
+                })
+
+        # 3. Workload limits check
+        if self.faculty_id and self.subject_id:
+            assigned_qs = SectionSubjectAssignment.objects.filter(faculty=self.faculty)
+            if self.pk:
+                assigned_qs = assigned_qs.exclude(pk=self.pk)
+            total_weekly = sum(a.subject.weekly_periods for a in assigned_qs.select_related('subject'))
+            if total_weekly + self.subject.weekly_periods > self.faculty.max_weekly_periods:
+                raise ValidationError({
+                    'faculty': (
+                        f"Assigning '{self.subject.code}' ({self.subject.weekly_periods} periods/wk) exceeds "
+                        f"faculty max weekly limit ({self.faculty.max_weekly_periods} periods/wk). "
+                        f"Currently assigned: {total_weekly} periods/wk."
+                    )
+                })
 
     def __str__(self):
         role = "Primary" if self.is_primary else "Assistant"

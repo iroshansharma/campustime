@@ -21,6 +21,14 @@ import { SemestersPage } from './pages/academics/SemestersPage';
 import { SectionsPage } from './pages/academics/SectionsPage';
 import { SubjectsPage } from './pages/academics/SubjectsPage';
 
+// Faculty & Rooms Management Pages
+import { FacultyListPage } from './pages/faculty/FacultyListPage';
+import { FacultyAvailabilityPage } from './pages/faculty/FacultyAvailabilityPage';
+import { QualificationsPage } from './pages/faculty/QualificationsPage';
+import { SubjectAllocationPage } from './pages/faculty/SubjectAllocationPage';
+import { FacultyWorkloadPage } from './pages/faculty/FacultyWorkloadPage';
+import { RoomsPage } from './pages/rooms/RoomsPage';
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -52,6 +60,16 @@ export const App: React.FC = () => {
             >
               <Route index element={<Navigate to="/dashboard" replace />} />
               <Route path="dashboard" element={<DashboardPage />} />
+
+              {/* Faculty & Allocations Pages */}
+              <Route path="faculty/members" element={<FacultyListPage />} />
+              <Route path="faculty/availability" element={<FacultyAvailabilityPage />} />
+              <Route path="faculty/qualifications" element={<QualificationsPage />} />
+              <Route path="faculty/allocations" element={<SubjectAllocationPage />} />
+              <Route path="faculty/workload" element={<FacultyWorkloadPage />} />
+
+              {/* Rooms & Labs */}
+              <Route path="rooms" element={<RoomsPage />} />
 
               {/* Academic Setup Pages */}
               <Route path="academics/colleges" element={<CollegesPage />} />

@@ -25,6 +25,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   const adminNav = [
     { label: 'Overview', to: '/dashboard', icon: LayoutDashboard },
+    { label: 'Faculty Directory', to: '/faculty/members', icon: Users },
+    { label: 'Availability Matrix', to: '/faculty/availability', icon: CalendarDays },
+    { label: 'Qualifications', to: '/faculty/qualifications', icon: GraduationCap },
+    { label: 'Subject Allocations', to: '/faculty/allocations', icon: BookOpen },
+    { label: 'Workload Overview', to: '/faculty/workload', icon: Layers },
+    { label: 'Rooms & Labs', to: '/rooms', icon: Building2 },
     { label: 'Colleges', to: '/academics/colleges', icon: Building2 },
     { label: 'Academic Years', to: '/academics/academic-years', icon: CalendarRange },
     { label: 'Shifts', to: '/academics/shifts', icon: Clock },
@@ -38,6 +44,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   const facultyNav = [
     { label: 'Dashboard', to: '/dashboard', icon: LayoutDashboard },
+    { label: 'My Availability', to: '/faculty/availability', icon: CalendarDays },
+    { label: 'Workload Overview', to: '/faculty/workload', icon: Layers },
     { label: 'Departments', to: '/academics/departments', icon: Layers },
     { label: 'Subjects', to: '/academics/subjects', icon: BookOpen },
   ];

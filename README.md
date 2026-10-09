@@ -180,6 +180,25 @@ All modifying requests (`POST`, `PUT`, `PATCH`, `DELETE`) require `Role=ADMIN`. 
 | `/api/v1/academics/sections/` | `GET`, `POST`, `PUT`, `PATCH`, `DELETE` | `?semester=<id>&department=<id>` |
 | `/api/v1/academics/subjects/` | `GET`, `POST`, `PUT`, `PATCH`, `DELETE` | `?department=<id>&subject_type=THEORY` |
 
+### Faculty & Teaching Allocation Endpoints
+Enforces qualifications, workload thresholds, and institution-level isolation. Students are denied access to private faculty management endpoints.
+
+| Endpoint | Supported Operations | Roles / Permitted Methods |
+|---|---|---|
+| `/api/v1/faculty/profiles/` | `GET`, `POST`, `PUT`, `PATCH`, `DELETE` | Admin: CRUD, Faculty: Read-only |
+| `/api/v1/faculty/profiles/{id}/workload/` | `GET` | Admin & Faculty (workload metrics & assignments) |
+| `/api/v1/faculty/qualifications/` | `GET`, `POST`, `PUT`, `PATCH`, `DELETE` | Admin: CRUD, Faculty: Read-only |
+| `/api/v1/faculty/availability/` | `GET`, `POST`, `PUT`, `PATCH`, `DELETE` | Admin: All, Faculty: Self-only |
+| `/api/v1/faculty/availability/batch-update/` | `POST` | Admin: All, Faculty: Self-only (atomic matrix update) |
+| `/api/v1/faculty/assignments/` | `GET`, `POST`, `PUT`, `PATCH`, `DELETE` | Admin: CRUD (qualification & capacity verified) |
+
+### Rooms & Facilities Endpoints
+| Endpoint | Supported Operations | Query Filters |
+|---|---|---|
+| `/api/v1/rooms/rooms/` | `GET`, `POST`, `PUT`, `PATCH`, `DELETE` | `?department=<id>&room_type=LAB&min_capacity=40` |
+| `/api/v1/rooms/availability/` | `GET`, `POST`, `PUT`, `PATCH`, `DELETE` | `?room=<id>&is_available=true` |
+
+---
 
 ### 3. Frontend Setup
 
@@ -206,14 +225,14 @@ The application will be accessible at `http://localhost:5173/`.
 ```bash
 cd backend
 .\venv\Scripts\pytest
-# (42 tests passing covering models, constraints, auth, and academics API)
+# (55 tests passing covering models, constraints, auth, academics, faculty, availability, allocations, and rooms)
 ```
 
 ### Frontend Tests (Vitest)
 ```bash
 cd frontend
 npx vitest run
-# (9 tests passing covering token storage, API client, and role route guards)
+# (17 tests passing covering auth, routing, availability grid, and subject allocation workflows)
 ```
 
 ---
