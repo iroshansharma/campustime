@@ -192,38 +192,28 @@ npm install
 
 # Start Vite dev server
 npm run dev
+
+# Run TypeScript checks & production build
+npm run build
 ```
 The application will be accessible at `http://localhost:5173/`.
 
 ---
 
-## 10-Step Administration Flow
-
-1. **College & Academic Years**: Define institution details and active academic years.
-2. **Working Days & Shifts**: Configure Shift I / Shift II timings, period durations, and break slots.
-3. **Departments & Semesters**: Create academic departments, semesters, and student sections.
-4. **Faculty Profiles & Availability**: Add teachers and define their weekly time availability slots.
-5. **Subjects & Qualifications**: Register subjects (theory vs. lab) and map qualified instructors.
-6. **Section Allocations**: Allocate subject-faculty assignments per section.
-7. **Curriculum Requirements**: Set weekly periods required and consecutive lab duration requirements.
-8. **Classrooms & Labs**: Add rooms, seat capacities, and lab equipment designations.
-9. **Generation Settings**: Set generator parameters, optimization priorities, and locked slots.
-10. **Generate, Review & Publish**: Run the CSP engine, review conflict diagnostics, refine entries, and publish.
-
----
-
 ## Running Tests
 
-### Backend Tests
+### Backend Tests (Pytest)
 ```bash
 cd backend
-pytest
+.\venv\Scripts\pytest
+# (42 tests passing covering models, constraints, auth, and academics API)
 ```
 
-### Frontend Tests
+### Frontend Tests (Vitest)
 ```bash
 cd frontend
-npm run test
+npx vitest run
+# (9 tests passing covering token storage, API client, and role route guards)
 ```
 
 ---
