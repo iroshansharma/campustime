@@ -123,10 +123,11 @@ export const academicsService = {
   },
 
   // Semesters
-  async getSemesters(deptId?: number, academicYearId?: number): Promise<Semester[]> {
+  async getSemesters(deptId?: number, academicYearId?: number, shiftId?: number): Promise<Semester[]> {
     const params: Record<string, unknown> = {};
     if (deptId) params.department = deptId;
     if (academicYearId) params.academic_year = academicYearId;
+    if (shiftId) params.shift = shiftId;
     const res = await apiClient.get<PaginatedResponse<Semester> | Semester[]>('/academics/semesters/', { params });
     return extractData(res);
   },

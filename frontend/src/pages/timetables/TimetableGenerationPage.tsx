@@ -238,9 +238,12 @@ export const TimetableGenerationPage: React.FC = () => {
   const handleGenerate = () => {
     if (!academicYearId) return;
 
+    const chosenSem = semesterId ? semesters.find((s) => s.id === Number(semesterId)) : undefined;
+    const effectiveShiftId = chosenSem ? chosenSem.shift : (shiftId ? Number(shiftId) : undefined);
+
     const payload: GenerateSchedulePayload = {
       academic_year_id: Number(academicYearId),
-      shift_id: shiftId ? Number(shiftId) : undefined,
+      shift_id: effectiveShiftId,
       department_ids: departmentId ? [Number(departmentId)] : [],
       semester_ids: semesterId ? [Number(semesterId)] : [],
       section_ids: selectedSectionIds.length > 0 ? selectedSectionIds : undefined,
@@ -357,7 +360,17 @@ export const TimetableGenerationPage: React.FC = () => {
               <select
                 aria-label="Shift"
                 value={shiftId}
-                onChange={(e) => setShiftId(e.target.value ? Number(e.target.value) : '')}
+                onChange={(e) => {
+                  const val = e.target.value ? Number(e.target.value) : '';
+                  setShiftId(val);
+                  if (val && semesterId) {
+                    const currentSem = semesters.find((s) => s.id === Number(semesterId));
+                    if (currentSem && currentSem.shift !== val) {
+                      setSemesterId('');
+                      setSelectedSectionIds([]);
+                    }
+                  }
+                }}
                 className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500 bg-white"
               >
                 <option value="">All Shifts</option>
@@ -400,8 +413,15 @@ export const TimetableGenerationPage: React.FC = () => {
                 aria-label="Semester"
                 value={semesterId}
                 onChange={(e) => {
-                  setSemesterId(e.target.value ? Number(e.target.value) : '');
+                  const val = e.target.value ? Number(e.target.value) : '';
+                  setSemesterId(val);
                   setSelectedSectionIds([]);
+                  if (val) {
+                    const chosenSem = semesters.find((s) => s.id === val);
+                    if (chosenSem && chosenSem.shift) {
+                      setShiftId(chosenSem.shift);
+                    }
+                  }
                 }}
                 disabled={!academicYearId}
                 className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500 bg-white disabled:bg-slate-50 disabled:text-slate-400"
@@ -409,7 +429,7 @@ export const TimetableGenerationPage: React.FC = () => {
                 <option value="">All Semesters</option>
                 {semesters.map((s) => (
                   <option key={s.id} value={s.id}>
-                    Sem {s.semester_number} ({s.department_code || 'Dept'})
+                    Sem {s.semester_number} ({s.department_code || 'Dept'}{s.shift_name ? ` • ${s.shift_name}` : ''})
                   </option>
                 ))}
               </select>

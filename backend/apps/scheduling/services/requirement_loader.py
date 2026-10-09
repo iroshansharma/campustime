@@ -146,6 +146,26 @@ class RequirementLoader:
             shift_ids.add(s.semester.shift_id)
 
         if not section_map:
+            # Check if sections exist in the scope but were excluded due to a shift mismatch
+            if scope.shift_id:
+                mismatch_qs = Section.objects.filter(
+                    semester__academic_year_id=scope.academic_year_id
+                ).select_related('semester__shift')
+                if scope.department_ids:
+                    mismatch_qs = mismatch_qs.filter(semester__department_id__in=scope.department_ids)
+                if scope.semester_ids:
+                    mismatch_qs = mismatch_qs.filter(semester_id__in=scope.semester_ids)
+                if scope.section_ids:
+                    mismatch_qs = mismatch_qs.filter(id__in=scope.section_ids)
+
+                if mismatch_qs.exists():
+                    found_shifts = sorted(list(set(s.semester.shift.name for s in mismatch_qs)))
+                    shifts_str = ", ".join(found_shifts)
+                    raise ValueError(
+                        f"Shift mismatch in scheduling scope: The selected semester/sections belong to '{shifts_str}', "
+                        f"but Shift ID {scope.shift_id} was selected. Please set Shift to '{shifts_str}' or 'All Shifts'."
+                    )
+
             scope_desc_parts = [f"academic_year_id={scope.academic_year_id}"]
             if scope.shift_id:
                 scope_desc_parts.append(f"shift_id={scope.shift_id}")
