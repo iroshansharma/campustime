@@ -102,13 +102,22 @@ pip install -r requirements.txt
 # Run migrations
 python manage.py migrate
 
-# Seed sample academic data
+# Seed sample academic data (idempotent, verified)
 python manage.py seed_academic_data
 
 # Run development server
 python manage.py runserver
 ```
 The REST API will be available at `http://127.0.0.1:8000/api/v1/`.
+
+### Demo Accounts Created by Seeder:
+| Role | Username | Email | Default Password | Notes |
+|---|---|---|---|---|
+| **Admin** | `admin` | `admin@campustime.local` | `AdminPass@123` | Full academic and timetable permissions |
+| **Faculty** | `dr.sharma` | `dr.sharma@campustime.local` | `FacultyPass@123` | Professor, CSE Department |
+| **Faculty** | `dr.verma` | `dr.verma@campustime.local` | `FacultyPass@123` | Associate Professor, CSE Department |
+| **Faculty** | `prof.kumar` | `prof.kumar@campustime.local` | `FacultyPass@123` | Assistant Professor, CSE Department |
+| **Student** | `student1` | `student1@campustime.local` | `StudentPass@123` | CSE Sem 5 Section A |
 
 ---
 
