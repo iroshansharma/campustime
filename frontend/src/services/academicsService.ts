@@ -143,9 +143,14 @@ export const academicsService = {
   },
 
   // Sections
-  async getSections(semesterId?: number): Promise<Section[]> {
-    const params = semesterId ? { semester: semesterId } : {};
-    const res = await apiClient.get<PaginatedResponse<Section> | Section[]>('/academics/sections/', { params });
+  async getSections(params?: { semester?: number; department?: number; academic_year?: number; shift?: number } | number): Promise<Section[]> {
+    let queryParams: Record<string, unknown> = {};
+    if (typeof params === 'number') {
+      queryParams = { semester: params };
+    } else if (params) {
+      queryParams = params as Record<string, unknown>;
+    }
+    const res = await apiClient.get<PaginatedResponse<Section> | Section[]>('/academics/sections/', { params: queryParams });
     return extractData(res);
   },
   async createSection(payload: Partial<Section>): Promise<Section> {

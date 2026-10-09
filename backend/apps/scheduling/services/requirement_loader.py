@@ -146,7 +146,20 @@ class RequirementLoader:
             shift_ids.add(s.semester.shift_id)
 
         if not section_map:
-            raise ValueError("No sections found for the specified scheduling scope.")
+            scope_desc_parts = [f"academic_year_id={scope.academic_year_id}"]
+            if scope.shift_id:
+                scope_desc_parts.append(f"shift_id={scope.shift_id}")
+            if scope.department_ids:
+                scope_desc_parts.append(f"department_ids={scope.department_ids}")
+            if scope.semester_ids:
+                scope_desc_parts.append(f"semester_ids={scope.semester_ids}")
+            if scope.section_ids:
+                scope_desc_parts.append(f"section_ids={scope.section_ids}")
+            scope_desc = ", ".join(scope_desc_parts)
+            raise ValueError(
+                f"No sections found for the specified scheduling scope ({scope_desc}). "
+                f"Please ensure sections are configured for this department/semester under Academic Management."
+            )
 
         # 2. Resolve Active Period Slots for the relevant shifts
         slots_qs = PeriodSlot.objects.filter(
@@ -288,11 +301,10 @@ class RequirementLoader:
                 pass
 
         # Protect against double-booking shared resources in OTHER active/published timetables
-        # in the same academic year
+        # in the same academic year (Draft timetables do not lock shared resources)
         other_entries_qs = TimetableEntry.objects.filter(
-            timetable__academic_year_id=scope.academic_year_id
-        ).exclude(
-            timetable__status=Timetable.Status.ARCHIVED
+            timetable__academic_year_id=scope.academic_year_id,
+            timetable__status=Timetable.Status.PUBLISHED
         )
         if target_timetable:
             other_entries_qs = other_entries_qs.exclude(timetable=target_timetable)

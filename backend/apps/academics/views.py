@@ -193,11 +193,17 @@ class SectionViewSet(viewsets.ModelViewSet):
         qs = Section.objects.select_related('semester__department', 'semester__shift').all().order_by('semester', 'name')
         semester_id = self.request.query_params.get('semester')
         dept_id = self.request.query_params.get('department')
+        academic_year_id = self.request.query_params.get('academic_year')
+        shift_id = self.request.query_params.get('shift')
 
         if semester_id:
             qs = qs.filter(semester_id=semester_id)
         if dept_id:
             qs = qs.filter(semester__department_id=dept_id)
+        if academic_year_id:
+            qs = qs.filter(semester__academic_year_id=academic_year_id)
+        if shift_id:
+            qs = qs.filter(semester__shift_id=shift_id)
         return qs
 
 

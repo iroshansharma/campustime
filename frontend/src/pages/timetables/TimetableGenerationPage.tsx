@@ -449,6 +449,20 @@ export const TimetableGenerationPage: React.FC = () => {
               </div>
             </div>
           )}
+
+          {/* Warning when selected semester has no sections */}
+          {semesterId && sections.length === 0 && (
+            <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-amber-800 text-xs flex items-start gap-2.5">
+              <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+              <div>
+                <span className="font-semibold text-amber-900">No Sections in Selected Semester</span>
+                <p className="mt-0.5 text-amber-800">
+                  This semester has 0 student sections configured. Timetable generation requires at least one active section.
+                  Please select an active semester (e.g. Semester 5) or configure sections in Academic Management.
+                </p>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Right: Engine Settings & Trigger */}
@@ -522,7 +536,7 @@ export const TimetableGenerationPage: React.FC = () => {
               variant="primary"
               size="lg"
               className="w-full justify-center gap-2 py-3 shadow-md shadow-brand-500/20"
-              disabled={!academicYearId || generateMutation.isPending}
+              disabled={!academicYearId || (!!semesterId && sections.length === 0) || generateMutation.isPending}
               onClick={handleGenerate}
             >
               {generateMutation.isPending ? (
@@ -537,6 +551,11 @@ export const TimetableGenerationPage: React.FC = () => {
                 </>
               )}
             </Button>
+            {semesterId && sections.length === 0 && (
+              <p className="text-center text-xs text-amber-600 font-medium mt-2">
+                Cannot generate: selected semester has no sections.
+              </p>
+            )}
           </div>
         </div>
       </div>
@@ -616,6 +635,24 @@ export const TimetableGenerationPage: React.FC = () => {
                   <p className="text-slate-700">
                     No combination of assignments can satisfy all 12 institutional constraints simultaneously. Review the Operational Bottlenecks panel below for specific resource deficits.
                   </p>
+                </div>
+              )}
+
+              {generationResult.status === 'ERROR' && (
+                <div className="mt-3 p-3 bg-white/70 border border-rose-300 rounded-lg text-xs space-y-1.5 text-rose-950">
+                  <div className="font-semibold flex items-center gap-1.5 text-rose-900">
+                    <AlertCircle className="h-4 w-4 text-rose-600" />
+                    Scheduling Scope / Requirements Configuration Error
+                  </div>
+                  <p className="text-slate-700">{generationResult.message}</p>
+                  <div className="text-slate-700">
+                    <span className="font-semibold text-slate-800">Recommended Next Steps:</span>
+                    <ul className="list-disc list-inside mt-0.5 space-y-0.5 text-slate-600">
+                      <li>Check that student sections exist for the selected department, shift, and semester.</li>
+                      <li>Verify that teaching requirements and faculty allocations are assigned for each section in Academic & Faculty Management.</li>
+                      <li>Adjust your filters to select a scope with configured sections (e.g., Department: CSE, Semester: 5).</li>
+                    </ul>
+                  </div>
                 </div>
               )}
             </div>

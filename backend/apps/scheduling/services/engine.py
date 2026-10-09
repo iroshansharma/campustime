@@ -79,6 +79,14 @@ class TimetableGenerationEngine:
                 success=False,
                 status='ERROR',
                 message=f"Failed loading scheduling requirements: {str(e)}",
+                bottlenecks=[
+                    DiagnosticBottleneck(
+                        category='SCOPE_EMPTY',
+                        affected_entity='Scheduling Scope',
+                        summary=str(e),
+                        suggested_action='Ensure active sections, shifts, and academic offerings are configured for this scope under Academic Management.'
+                    )
+                ],
                 duration_seconds=time.time() - start_time
             )
 
@@ -91,6 +99,14 @@ class TimetableGenerationEngine:
                 success=False,
                 status='ERROR',
                 message="No curriculum teaching requirements found for the selected scope.",
+                bottlenecks=[
+                    DiagnosticBottleneck(
+                        category='NO_REQUIREMENTS',
+                        affected_entity='Teaching Allocations',
+                        summary='The sections in scope have zero SectionSubjectRequirement or SectionSubjectAssignment entries.',
+                        suggested_action='Add weekly period requirements and faculty allocations for these sections in Academic & Faculty Management.'
+                    )
+                ],
                 duration_seconds=time.time() - start_time
             )
 
