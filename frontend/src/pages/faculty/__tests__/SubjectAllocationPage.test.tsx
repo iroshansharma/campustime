@@ -177,6 +177,8 @@ describe('SubjectAllocationPage', () => {
     expect(await screen.findByText('Data Structures')).toBeInTheDocument();
     expect(await screen.findByText('Data Structures Lab')).toBeInTheDocument();
     expect(await screen.findByText('Room Capacity Feasibility')).toBeInTheDocument();
+    expect(await screen.findByText(/Classrooms \(Capacity ≥ 50\):/i)).toBeInTheDocument();
+    expect(await screen.findByText(/Labs \(Capacity ≥ 50\):/i)).toBeInTheDocument();
   });
 
   it('identifies unassigned subjects and displays warning status', async () => {

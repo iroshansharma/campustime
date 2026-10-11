@@ -388,13 +388,13 @@ export const SubjectAllocationPage: React.FC = () => {
           </div>
           <div className="mt-2 text-xs text-slate-600 dark:text-slate-300 space-y-1">
             <div className="flex justify-between">
-              <span>Classrooms (Cap $\ge$ {activeSectionObj?.student_count ?? 60}):</span>
+              <span>Classrooms (Capacity ≥ {activeSectionObj?.student_count ?? 60}):</span>
               <span className={`font-bold ${roomFeasibility.suitableClassrooms > 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
                 {roomFeasibility.suitableClassrooms} available
               </span>
             </div>
             <div className="flex justify-between">
-              <span>Labs (Cap $\ge$ {activeSectionObj?.student_count ?? 60}):</span>
+              <span>Labs (Capacity ≥ {activeSectionObj?.student_count ?? 60}):</span>
               <span className={`font-bold ${roomFeasibility.suitableLabs > 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
                 {roomFeasibility.suitableLabs} available
               </span>

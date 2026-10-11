@@ -54,12 +54,6 @@ export const LoginPage: React.FC = () => {
     }
   };
 
-  const fillCredentials = (u: string, p: string) => {
-    setUsername(u);
-    setPassword(p);
-    setError(null);
-  };
-
   return (
     <div className="flex min-h-screen items-center justify-center bg-slate-900 px-4 py-12 sm:px-6 lg:px-8">
       {/* Decorative background glow */}
@@ -68,7 +62,7 @@ export const LoginPage: React.FC = () => {
         <div className="absolute -bottom-40 -left-40 h-96 w-96 rounded-full bg-indigo-500/10 blur-3xl" />
       </div>
 
-      <div className="relative w-full max-w-md space-y-8 rounded-2xl bg-white p-8 shadow-2xl ring-1 ring-slate-900/10">
+      <div className="relative w-full max-w-md space-y-6 rounded-2xl bg-white p-8 shadow-2xl ring-1 ring-slate-900/10">
         {/* Header */}
         <div className="text-center">
           <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-600 text-white shadow-lg shadow-brand-500/30">
@@ -82,37 +76,6 @@ export const LoginPage: React.FC = () => {
           </p>
         </div>
 
-        {/* Demo Fast-Login Chips */}
-        <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-          <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-600 mb-2">
-            <Sparkles className="h-3.5 w-3.5 text-brand-600" />
-            <span>Quick Demo Credentials</span>
-          </div>
-          <div className="grid grid-cols-3 gap-2">
-            <button
-              type="button"
-              onClick={() => fillCredentials('admin', 'AdminPass@123')}
-              className="px-2 py-1.5 text-xs font-medium rounded-lg border border-slate-200 bg-white hover:bg-brand-50 hover:border-brand-300 hover:text-brand-700 transition-colors shadow-sm"
-            >
-              Admin
-            </button>
-            <button
-              type="button"
-              onClick={() => fillCredentials('dr.sharma', 'FacultyPass@123')}
-              className="px-2 py-1.5 text-xs font-medium rounded-lg border border-slate-200 bg-white hover:bg-emerald-50 hover:border-emerald-300 hover:text-emerald-700 transition-colors shadow-sm"
-            >
-              Faculty
-            </button>
-            <button
-              type="button"
-              onClick={() => fillCredentials('student1', 'StudentPass@123')}
-              className="px-2 py-1.5 text-xs font-medium rounded-lg border border-slate-200 bg-white hover:bg-indigo-50 hover:border-indigo-300 hover:text-indigo-700 transition-colors shadow-sm"
-            >
-              Student
-            </button>
-          </div>
-        </div>
-
         {/* Error Alert */}
         {error && (
           <div className="flex items-center gap-2.5 rounded-lg border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700">
@@ -122,7 +85,7 @@ export const LoginPage: React.FC = () => {
         )}
 
         {/* Login Form */}
-        <form className="mt-8 space-y-5" onSubmit={handleSubmit}>
+        <form className="space-y-5" onSubmit={handleSubmit}>
           <div>
             <label className="block text-xs font-semibold uppercase tracking-wider text-slate-700 mb-1.5">
               Username
