@@ -9,6 +9,7 @@ export const LoginPage: React.FC = () => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isWakingUp, setIsWakingUp] = useState(false);
 
   const { login } = useAuth();
   const navigate = useNavigate();
@@ -25,6 +26,12 @@ export const LoginPage: React.FC = () => {
 
     setError(null);
     setIsLoading(true);
+    setIsWakingUp(false);
+
+    // If request takes more than 3.5s, inform the user about Render free-tier spin-up
+    const wakeUpTimer = setTimeout(() => {
+      setIsWakingUp(true);
+    }, 3500);
 
     try {
       await login(username, password);
@@ -38,10 +45,12 @@ export const LoginPage: React.FC = () => {
           setError(axErr.response?.data?.detail || 'Unable to authenticate. Please check backend connection.');
         }
       } else {
-        setError('Network error connecting to API server.');
+        setError('Network error connecting to API server (https://campustime.onrender.com). If the free instance was sleeping, please wait ~30 seconds and retry.');
       }
     } finally {
+      clearTimeout(wakeUpTimer);
       setIsLoading(false);
+      setIsWakingUp(false);
     }
   };
 
@@ -147,6 +156,13 @@ export const LoginPage: React.FC = () => {
               />
             </div>
           </div>
+
+          {isWakingUp && (
+            <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 p-2.5 text-xs text-amber-800 animate-pulse">
+              <Sparkles className="h-4 w-4 shrink-0 text-amber-600" />
+              <span>Connecting to backend... Free cloud instances wake up on first request (~30–50s). Please hold on!</span>
+            </div>
+          )}
 
           <Button
             type="submit"

@@ -4,7 +4,21 @@ import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 export const ACCESS_TOKEN_KEY = 'campustime_access_token';
 export const REFRESH_TOKEN_KEY = 'campustime_refresh_token';
 
-const rawBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000/api/v1';
+const resolveApiBaseUrl = (): string => {
+  if (import.meta.env.VITE_API_BASE_URL) {
+    return import.meta.env.VITE_API_BASE_URL;
+  }
+  // Production fallback for Vercel builds if VITE_API_BASE_URL was omitted at build time
+  if (
+    import.meta.env.PROD ||
+    (typeof window !== 'undefined' && window.location.hostname.includes('vercel.app'))
+  ) {
+    return 'https://campustime.onrender.com/api/v1';
+  }
+  return 'http://127.0.0.1:8000/api/v1';
+};
+
+const rawBaseUrl = resolveApiBaseUrl();
 export const API_BASE_URL = rawBaseUrl.replace(/\/+$/, '');
 
 export const apiClient = axios.create({
@@ -12,7 +26,7 @@ export const apiClient = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
-  timeout: 15000,
+  timeout: 60000, // 60s timeout to accommodate Render free-tier cold starts
 });
 
 // Concurrency control for token refreshing

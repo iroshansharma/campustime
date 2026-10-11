@@ -152,3 +152,37 @@ class TestAuthenticationAPI:
         api_client.credentials(HTTP_AUTHORIZATION='Bearer garbage_token_xyz')
         response = api_client.get('/api/v1/auth/me/')
         assert response.status_code == status.HTTP_401_UNAUTHORIZED
+
+    def test_cors_preflight_allowed_origin(self, api_client):
+        """Preflight OPTIONS request from production frontend must return Access-Control headers."""
+        response = api_client.options(
+            '/api/v1/auth/token/',
+            HTTP_ORIGIN='https://campustime-pi.vercel.app',
+            HTTP_ACCESS_CONTROL_REQUEST_METHOD='POST',
+            HTTP_ACCESS_CONTROL_REQUEST_HEADERS='content-type',
+        )
+        assert response.status_code == status.HTTP_200_OK
+        assert response.headers.get('Access-Control-Allow-Origin') == 'https://campustime-pi.vercel.app'
+        allow_methods = response.headers.get('Access-Control-Allow-Methods', '')
+        assert 'POST' in allow_methods
+
+    def test_cors_preflight_disallowed_origin(self, api_client):
+        """Unauthorized origin must NOT receive Access-Control-Allow-Origin."""
+        response = api_client.options(
+            '/api/v1/auth/token/',
+            HTTP_ORIGIN='https://malicious-site.example.com',
+            HTTP_ACCESS_CONTROL_REQUEST_METHOD='POST',
+        )
+        assert response.headers.get('Access-Control-Allow-Origin') is None
+
+    def test_health_check_endpoints(self, api_client):
+        """Health endpoints must be read-only, lightweight, and return 200 OK."""
+        res_root = api_client.get('/health/')
+        assert res_root.status_code == status.HTTP_200_OK
+        assert res_root.json()['status'] == 'healthy'
+
+        res_api = api_client.get('/api/v1/health/')
+        assert res_api.status_code == status.HTTP_200_OK
+        data = res_api.json()
+        assert data['status'] == 'healthy'
+        assert data['database'] == 'healthy'

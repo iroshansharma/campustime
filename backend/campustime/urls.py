@@ -14,13 +14,29 @@ from drf_spectacular.views import (
 )
 
 
+from django.db import connection
+
+
 def health_check(request):
-    """Public healthcheck probe for Render / container orchestrators."""
+    """
+    Public, read-only health probe for monitoring and container orchestrators.
+    Returns HTTP 200 with service status. Never leaks credentials, stack traces, or internal data.
+    """
+    db_status = "healthy"
+    if request.path.startswith('/api/v1/health'):
+        try:
+            with connection.cursor() as cursor:
+                cursor.execute("SELECT 1;")
+        except Exception:
+            db_status = "unavailable"
+
+    status_code = 200 if db_status == "healthy" else 503
     return JsonResponse({
-        'status': 'healthy',
+        'status': 'healthy' if status_code == 200 else 'degraded',
         'service': 'campustime-api',
+        'database': db_status,
         'environment': 'development' if settings.DEBUG else 'production',
-    })
+    }, status=status_code)
 
 
 urlpatterns = [

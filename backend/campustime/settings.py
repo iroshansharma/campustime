@@ -13,15 +13,31 @@ import environ
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+# Default production and local development origins
+BASE_ALLOWED_HOSTS = ['localhost', '127.0.0.1', '.onrender.com', 'campustime.onrender.com']
+BASE_CORS_ORIGINS = [
+    'https://campustime-pi.vercel.app',
+    'https://campustime.vercel.app',
+    'http://localhost:5173',
+    'http://127.0.0.1:5173',
+]
+BASE_CSRF_ORIGINS = [
+    'https://campustime-pi.vercel.app',
+    'https://campustime.vercel.app',
+    'https://campustime.onrender.com',
+    'http://localhost:5173',
+    'http://127.0.0.1:5173',
+]
+
 # Initialize environment variables
 env = environ.Env(
     DEBUG=(bool, True),
     SECRET_KEY=(str, 'django-insecure-campustime-dev-secret-key-change-in-production-^99*#'),
-    ALLOWED_HOSTS=(list, ['localhost', '127.0.0.1']),
+    ALLOWED_HOSTS=(list, BASE_ALLOWED_HOSTS),
     DATABASE_URL=(str, ''),
     USE_SQLITE=(bool, False),
-    CORS_ALLOWED_ORIGINS=(list, ['http://localhost:5173', 'http://127.0.0.1:5173']),
-    CSRF_TRUSTED_ORIGINS=(list, ['http://localhost:5173', 'http://127.0.0.1:5173']),
+    CORS_ALLOWED_ORIGINS=(list, BASE_CORS_ORIGINS),
+    CSRF_TRUSTED_ORIGINS=(list, BASE_CSRF_ORIGINS),
     CORS_ALLOW_ALL_ORIGINS=(bool, False),
 )
 
@@ -39,7 +55,8 @@ SECRET_KEY = env('SECRET_KEY')
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = env('DEBUG')
 
-ALLOWED_HOSTS = env('ALLOWED_HOSTS')
+_env_hosts = env.list('ALLOWED_HOSTS', default=BASE_ALLOWED_HOSTS)
+ALLOWED_HOSTS = list(dict.fromkeys(BASE_ALLOWED_HOSTS + _env_hosts))
 # Automatically append Render external hostname if running on Render
 RENDER_EXTERNAL_HOSTNAME = os.environ.get('RENDER_EXTERNAL_HOSTNAME')
 if RENDER_EXTERNAL_HOSTNAME and RENDER_EXTERNAL_HOSTNAME not in ALLOWED_HOSTS:
@@ -217,12 +234,16 @@ SIMPLE_JWT = {
 }
 
 # CORS Configuration
-CORS_ALLOWED_ORIGINS = env('CORS_ALLOWED_ORIGINS')
-CORS_ALLOW_ALL_ORIGINS = env.bool('CORS_ALLOW_ALL_ORIGINS', default=False)
+_env_cors = env.list('CORS_ALLOWED_ORIGINS', default=BASE_CORS_ORIGINS)
+# Guarantee production origins are allowed while respecting additional custom env origins
+CORS_ALLOWED_ORIGINS = list(dict.fromkeys(BASE_CORS_ORIGINS + _env_cors))
+CORS_ALLOW_ALL_ORIGINS = False
 CORS_ALLOW_CREDENTIALS = True
+CORS_PREFLIGHT_MAX_AGE = 86400  # Cache preflight response for 24h
 
 # CSRF Trusted Origins (required for Django 4+ in production behind proxies)
-CSRF_TRUSTED_ORIGINS = env.list('CSRF_TRUSTED_ORIGINS', default=['http://localhost:5173', 'http://127.0.0.1:5173'])
+_env_csrf = env.list('CSRF_TRUSTED_ORIGINS', default=BASE_CSRF_ORIGINS)
+CSRF_TRUSTED_ORIGINS = list(dict.fromkeys(BASE_CSRF_ORIGINS + _env_csrf))
 if RENDER_EXTERNAL_HOSTNAME:
     render_origin = f'https://{RENDER_EXTERNAL_HOSTNAME}'
     if render_origin not in CSRF_TRUSTED_ORIGINS:
