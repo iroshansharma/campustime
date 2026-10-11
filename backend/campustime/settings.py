@@ -39,6 +39,7 @@ env = environ.Env(
     CORS_ALLOWED_ORIGINS=(list, BASE_CORS_ORIGINS),
     CSRF_TRUSTED_ORIGINS=(list, BASE_CSRF_ORIGINS),
     CORS_ALLOW_ALL_ORIGINS=(bool, False),
+    ADMIN_BOOTSTRAP_SECRET=(str, ''),
 )
 
 # Read from .env at workspace root or backend dir if present
@@ -317,3 +318,6 @@ try:
         raise ValueError("SCHEDULER_MAX_BACKTRACK_STEPS must be positive.")
 except (ValueError, TypeError) as exc:
     raise ValueError(f"Invalid SCHEDULER_MAX_BACKTRACK_STEPS environment configuration: {exc}")
+
+# Secure Admin Bootstrap Secret Token (for headless emergency password reset/bootstrap)
+ADMIN_BOOTSTRAP_SECRET = env('ADMIN_BOOTSTRAP_SECRET', default='')

@@ -18,4 +18,9 @@ python manage.py migrate --no-input
 echo ">>> [4/4] Ensuring academic baseline seed data..."
 python manage.py seed_academic_data
 
+if [ -n "$ADMIN_BOOTSTRAP_PASSWORD" ]; then
+    echo ">>> Running administrator bootstrap..."
+    python manage.py bootstrap_admin
+fi
+
 echo ">>> CampusTime build completed successfully!"

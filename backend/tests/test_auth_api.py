@@ -236,3 +236,103 @@ class TestAuthenticationAPI:
         assert db_config['ENGINE'] == 'django.db.backends.postgresql'
         assert db_config['NAME'] == 'neondb'
         assert db_config['CONN_MAX_AGE'] == 600
+
+    def test_bootstrap_admin_command_updates_existing_user(self):
+        """bootstrap_admin command safely resets password and ensures superuser flags."""
+        from django.core.management import call_command
+        from apps.accounts.models import User
+        import io
+
+        # Create user with initial password
+        user = User.objects.create_user(
+            username='test_bootstrap_user',
+            email='bootstrap@test.com',
+            password='OldPassword123!',
+            role=User.Role.ADMIN
+        )
+
+        out = io.StringIO()
+        call_command(
+            'bootstrap_admin',
+            username='test_bootstrap_user',
+            password='NewSecurePassword456!',
+            stdout=out
+        )
+
+        user.refresh_from_db()
+        assert user.check_password('NewSecurePassword456!') is True
+        assert user.is_staff is True
+        assert user.is_superuser is True
+        assert user.is_active is True
+
+    def test_bootstrap_admin_command_skips_when_no_password(self):
+        """bootstrap_admin command exits cleanly without error when no password is provided."""
+        from django.core.management import call_command
+        import io
+
+        out = io.StringIO()
+        call_command('bootstrap_admin', username='some_user', stdout=out)
+        assert "Skipping admin bootstrap" in out.getvalue()
+
+    def test_admin_bootstrap_endpoint_disabled_by_default(self, api_client):
+        """Endpoint must return 404 Not Found when ADMIN_BOOTSTRAP_SECRET is not configured."""
+        from django.conf import settings
+        old_secret = getattr(settings, 'ADMIN_BOOTSTRAP_SECRET', '')
+        try:
+            settings.ADMIN_BOOTSTRAP_SECRET = ''
+            response = api_client.post('/api/v1/auth/bootstrap-admin/', {
+                'username': 'admin',
+                'password': 'AnyPassword123!'
+            }, format='json')
+            assert response.status_code == status.HTTP_404_NOT_FOUND
+        finally:
+            settings.ADMIN_BOOTSTRAP_SECRET = old_secret
+
+    def test_admin_bootstrap_endpoint_forbidden_with_invalid_key(self, api_client):
+        """Endpoint must return 403 Forbidden when secret header does not match."""
+        from django.conf import settings
+        old_secret = getattr(settings, 'ADMIN_BOOTSTRAP_SECRET', '')
+        try:
+            settings.ADMIN_BOOTSTRAP_SECRET = 'super-secret-token-1234567890'
+            response = api_client.post(
+                '/api/v1/auth/bootstrap-admin/',
+                {'username': 'admin', 'password': 'AnyPassword123!'},
+                format='json',
+                HTTP_X_ADMIN_BOOTSTRAP_KEY='wrong-token'
+            )
+            assert response.status_code == status.HTTP_403_FORBIDDEN
+        finally:
+            settings.ADMIN_BOOTSTRAP_SECRET = old_secret
+
+    def test_admin_bootstrap_endpoint_success_and_subsequent_login(self, api_client):
+        """Endpoint updates credentials with valid key and allows subsequent login."""
+        from django.conf import settings
+        old_secret = getattr(settings, 'ADMIN_BOOTSTRAP_SECRET', '')
+        valid_secret = 'secure-bootstrap-key-998877665544332211'
+        try:
+            settings.ADMIN_BOOTSTRAP_SECRET = valid_secret
+            # 1. Reset password via endpoint
+            response = api_client.post(
+                '/api/v1/auth/bootstrap-admin/',
+                {
+                    'username': 'endpoint_admin',
+                    'password': 'EndpointResetPass123!',
+                    'email': 'endpoint_admin@campustime.local'
+                },
+                format='json',
+                HTTP_X_ADMIN_BOOTSTRAP_KEY=valid_secret
+            )
+            assert response.status_code == status.HTTP_200_OK
+            assert response.json()['status'] == 'success'
+
+            # 2. Verify subsequent login succeeds with the new password
+            login_resp = api_client.post('/api/v1/auth/token/', {
+                'username': 'endpoint_admin',
+                'password': 'EndpointResetPass123!'
+            }, format='json')
+            assert login_resp.status_code == status.HTTP_200_OK
+            assert 'access' in login_resp.json()
+            assert login_resp.json()['user']['role'] == 'ADMIN'
+        finally:
+            settings.ADMIN_BOOTSTRAP_SECRET = old_secret
+
