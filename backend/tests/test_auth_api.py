@@ -166,14 +166,33 @@ class TestAuthenticationAPI:
         allow_methods = response.headers.get('Access-Control-Allow-Methods', '')
         assert 'POST' in allow_methods
 
-    def test_cors_preflight_disallowed_origin(self, api_client):
-        """Unauthorized origin must NOT receive Access-Control-Allow-Origin."""
+    def test_cors_preflight_vercel_preview_origin_allowed(self, api_client):
+        """Dynamic preview deployments for this specific project must receive Access-Control headers."""
+        preview_origin = 'https://campustime-cliby123-iroshansharmas-projects.vercel.app'
         response = api_client.options(
             '/api/v1/auth/token/',
-            HTTP_ORIGIN='https://malicious-site.example.com',
+            HTTP_ORIGIN=preview_origin,
             HTTP_ACCESS_CONTROL_REQUEST_METHOD='POST',
+            HTTP_ACCESS_CONTROL_REQUEST_HEADERS='content-type',
         )
-        assert response.headers.get('Access-Control-Allow-Origin') is None
+        assert response.status_code == status.HTTP_200_OK
+        assert response.headers.get('Access-Control-Allow-Origin') == preview_origin
+
+    def test_cors_preflight_disallowed_origin(self, api_client):
+        """Unauthorized origins must NOT receive Access-Control-Allow-Origin."""
+        disallowed = [
+            'https://malicious-site.example.com',
+            'https://otherproject-iroshansharmas-projects.vercel.app',
+            'https://campustime-pi.vercel.app.attacker.com',
+            'https://attacker-campustime.vercel.app',
+        ]
+        for origin in disallowed:
+            response = api_client.options(
+                '/api/v1/auth/token/',
+                HTTP_ORIGIN=origin,
+                HTTP_ACCESS_CONTROL_REQUEST_METHOD='POST',
+            )
+            assert response.headers.get('Access-Control-Allow-Origin') is None, f"Origin {origin} should not be allowed"
 
     def test_health_check_endpoints(self, api_client):
         """Health endpoints must be read-only, lightweight, and return 200 OK."""

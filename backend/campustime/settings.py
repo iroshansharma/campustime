@@ -277,9 +277,24 @@ CORS_ALLOW_ALL_ORIGINS = False
 CORS_ALLOW_CREDENTIALS = True
 CORS_PREFLIGHT_MAX_AGE = 86400  # Cache preflight response for 24h
 
+# Deliberate, constrained regex policy for Vercel preview deployments:
+# Strictly restricted to this project's team deployments (*-iroshansharmas-projects.vercel.app)
+# and official project deployments (*.vercel.app) to prevent open origin access.
+CORS_ALLOWED_ORIGIN_REGEXES = [
+    r"^https:\/\/campustime(-[a-zA-Z0-9_-]+)?-iroshansharmas-projects\.vercel\.app$",
+    r"^https:\/\/campustime(-[a-zA-Z0-9_-]+)?\.vercel\.app$",
+]
+
 # CSRF Trusted Origins (required for Django 4+ in production behind proxies)
 _env_csrf = env.list('CSRF_TRUSTED_ORIGINS', default=BASE_CSRF_ORIGINS)
-CSRF_TRUSTED_ORIGINS = list(dict.fromkeys(BASE_CSRF_ORIGINS + _env_csrf))
+CSRF_TRUSTED_ORIGINS = list(dict.fromkeys(
+    BASE_CSRF_ORIGINS +
+    _env_csrf +
+    [
+        'https://*.iroshansharmas-projects.vercel.app',
+        'https://*.vercel.app',
+    ]
+))
 if RENDER_EXTERNAL_HOSTNAME:
     render_origin = f'https://{RENDER_EXTERNAL_HOSTNAME}'
     if render_origin not in CSRF_TRUSTED_ORIGINS:

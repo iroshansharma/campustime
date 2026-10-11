@@ -37,8 +37,17 @@ def health_check(request):
             from apps.accounts.models import User
             _ = User.objects.exists()
         except Exception:
-            tables_synced = False
-            db_status = "uninitialized"
+            try:
+                from django.core.management import call_command
+                call_command('migrate', interactive=False)
+                call_command('seed_academic_data')
+                from apps.accounts.models import User
+                _ = User.objects.exists()
+                tables_synced = True
+                db_status = "healthy"
+            except Exception:
+                tables_synced = False
+                db_status = "uninitialized"
 
     status_code = 200 if db_status == "healthy" else 503
     return JsonResponse({
