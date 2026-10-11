@@ -4,7 +4,8 @@ import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 export const ACCESS_TOKEN_KEY = 'campustime_access_token';
 export const REFRESH_TOKEN_KEY = 'campustime_refresh_token';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000/api/v1';
+const rawBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000/api/v1';
+export const API_BASE_URL = rawBaseUrl.replace(/\/+$/, '');
 
 export const apiClient = axios.create({
   baseURL: API_BASE_URL,

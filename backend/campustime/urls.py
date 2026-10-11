@@ -1,17 +1,34 @@
 """
 CampusTime URL Configuration
-Root routing pointing to /api/v1/ and admin site.
+Root routing pointing to /api/v1/, health checks, and admin site.
 """
 
 from django.contrib import admin
 from django.urls import path, include
+from django.http import JsonResponse
+from django.conf import settings
 from drf_spectacular.views import (
     SpectacularAPIView,
     SpectacularRedocView,
     SpectacularSwaggerView
 )
 
+
+def health_check(request):
+    """Public healthcheck probe for Render / container orchestrators."""
+    return JsonResponse({
+        'status': 'healthy',
+        'service': 'campustime-api',
+        'environment': 'development' if settings.DEBUG else 'production',
+    })
+
+
 urlpatterns = [
+    # Health checks for deployment platforms (e.g. Render zero-downtime healthcheck)
+    path('health/', health_check, name='health_check'),
+    path('api/v1/health/', health_check, name='api_health_check'),
+
+    # Admin site
     path('admin/', admin.site.urls),
 
     # API v1 routes

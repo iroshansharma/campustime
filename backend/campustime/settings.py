@@ -17,10 +17,12 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 env = environ.Env(
     DEBUG=(bool, True),
     SECRET_KEY=(str, 'django-insecure-campustime-dev-secret-key-change-in-production-^99*#'),
-    ALLOWED_HOSTS=(list, ['localhost', '127.0.0.1', '*']),
+    ALLOWED_HOSTS=(list, ['localhost', '127.0.0.1']),
     DATABASE_URL=(str, ''),
     USE_SQLITE=(bool, False),
     CORS_ALLOWED_ORIGINS=(list, ['http://localhost:5173', 'http://127.0.0.1:5173']),
+    CSRF_TRUSTED_ORIGINS=(list, ['http://localhost:5173', 'http://127.0.0.1:5173']),
+    CORS_ALLOW_ALL_ORIGINS=(bool, False),
 )
 
 # Read from .env at workspace root or backend dir if present
@@ -38,6 +40,17 @@ SECRET_KEY = env('SECRET_KEY')
 DEBUG = env('DEBUG')
 
 ALLOWED_HOSTS = env('ALLOWED_HOSTS')
+# Automatically append Render external hostname if running on Render
+RENDER_EXTERNAL_HOSTNAME = os.environ.get('RENDER_EXTERNAL_HOSTNAME')
+if RENDER_EXTERNAL_HOSTNAME and RENDER_EXTERNAL_HOSTNAME not in ALLOWED_HOSTS:
+    ALLOWED_HOSTS.append(RENDER_EXTERNAL_HOSTNAME)
+
+# Reverse proxy SSL header (essential for Render / reverse proxies terminating TLS)
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+
+if not DEBUG:
+    SESSION_COOKIE_SECURE = env.bool('SESSION_COOKIE_SECURE', default=True)
+    CSRF_COOKIE_SECURE = env.bool('CSRF_COOKIE_SECURE', default=True)
 
 # Application definition
 INSTALLED_APPS = [
@@ -67,6 +80,7 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -104,7 +118,7 @@ use_sqlite = env('USE_SQLITE')
 if db_url and not use_sqlite:
     try:
         DATABASES = {
-            'default': env.db_url('DATABASE_URL')
+            'default': env.db_url('DATABASE_URL', conn_max_age=600)
         }
     except Exception:
         DATABASES = {
@@ -150,6 +164,11 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 STATIC_URL = 'static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
+# Ensure staticfiles directory exists in dev/test runs
+STATIC_ROOT.mkdir(parents=True, exist_ok=True)
+
+# WhiteNoise production storage for compressed & cached static assets
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 MEDIA_URL = 'media/'
 MEDIA_ROOT = BASE_DIR / 'media'
@@ -199,7 +218,15 @@ SIMPLE_JWT = {
 
 # CORS Configuration
 CORS_ALLOWED_ORIGINS = env('CORS_ALLOWED_ORIGINS')
+CORS_ALLOW_ALL_ORIGINS = env.bool('CORS_ALLOW_ALL_ORIGINS', default=False)
 CORS_ALLOW_CREDENTIALS = True
+
+# CSRF Trusted Origins (required for Django 4+ in production behind proxies)
+CSRF_TRUSTED_ORIGINS = env.list('CSRF_TRUSTED_ORIGINS', default=['http://localhost:5173', 'http://127.0.0.1:5173'])
+if RENDER_EXTERNAL_HOSTNAME:
+    render_origin = f'https://{RENDER_EXTERNAL_HOSTNAME}'
+    if render_origin not in CSRF_TRUSTED_ORIGINS:
+        CSRF_TRUSTED_ORIGINS.append(render_origin)
 
 # Timetable Engine & Scheduler Configuration
 # Loaded from environment (.env) with strict validation
@@ -218,4 +245,3 @@ try:
         raise ValueError("SCHEDULER_MAX_BACKTRACK_STEPS must be positive.")
 except (ValueError, TypeError) as exc:
     raise ValueError(f"Invalid SCHEDULER_MAX_BACKTRACK_STEPS environment configuration: {exc}")
-
