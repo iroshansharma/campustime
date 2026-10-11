@@ -80,9 +80,15 @@ class AdminBootstrapView(APIView):
                 status=status.HTTP_403_FORBIDDEN
             )
 
-        username = (request.data.get('username') or 'admin').strip()
-        password = (request.data.get('password') or '').strip()
-        email = (request.data.get('email') or f'{username}@campustime.local').strip()
+        if not isinstance(request.data, dict):
+            return Response(
+                {'detail': 'Invalid JSON body. Expected a JSON object with username and password.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        username = (str(request.data.get('username') or 'admin')).strip()
+        password = (str(request.data.get('password') or '')).strip()
+        email = (str(request.data.get('email') or f'{username}@campustime.local')).strip()
 
         if not password or len(password) < 8:
             return Response(
@@ -92,6 +98,17 @@ class AdminBootstrapView(APIView):
 
         User = get_user_model()
         user = User.objects.filter(username=username).first()
+
+        from django.contrib.auth.password_validation import validate_password
+        from django.core.exceptions import ValidationError as DjangoValidationError
+
+        try:
+            validate_password(password, user=user)
+        except DjangoValidationError as exc:
+            return Response(
+                {'detail': 'Password requirement error: ' + '; '.join(exc.messages)},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
         if user:
             user.set_password(password)

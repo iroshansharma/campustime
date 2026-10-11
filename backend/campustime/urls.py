@@ -20,7 +20,8 @@ from django.db import connection
 def health_check(request):
     """
     Public, read-only health probe for monitoring and container orchestrators.
-    Returns HTTP 200 with service status. Never leaks credentials, stack traces, or internal data.
+    Verifies database connectivity and schema readiness without performing
+    migrations or modifying any records. Never leaks credentials or sensitive data.
     """
     db_status = "healthy"
     db_engine = connection.vendor
@@ -35,21 +36,14 @@ def health_check(request):
 
         try:
             from apps.accounts.models import User
-            _ = User.objects.exists()
+            # Verify table schema exists without requiring rows to be present
+            _ = list(User.objects.all()[:1])
+            tables_synced = True
         except Exception:
-            try:
-                from django.core.management import call_command
-                call_command('migrate', interactive=False)
-                call_command('seed_academic_data')
-                from apps.accounts.models import User
-                _ = User.objects.exists()
-                tables_synced = True
-                db_status = "healthy"
-            except Exception:
-                tables_synced = False
-                db_status = "uninitialized"
+            tables_synced = False
+            db_status = "uninitialized"
 
-    status_code = 200 if db_status == "healthy" else 503
+    status_code = 200 if db_status == "healthy" and tables_synced else 503
     return JsonResponse({
         'status': 'healthy' if status_code == 200 else 'degraded',
         'service': 'campustime-api',

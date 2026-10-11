@@ -336,3 +336,30 @@ class TestAuthenticationAPI:
         finally:
             settings.ADMIN_BOOTSTRAP_SECRET = old_secret
 
+    def test_admin_bootstrap_endpoint_malformed_and_short_password(self, api_client):
+        """Endpoint rejects short passwords and malformed request bodies with 400 Bad Request."""
+        from django.conf import settings
+        old_secret = getattr(settings, 'ADMIN_BOOTSTRAP_SECRET', '')
+        valid_secret = 'secure-bootstrap-key-998877665544332211'
+        try:
+            settings.ADMIN_BOOTSTRAP_SECRET = valid_secret
+            # Short password
+            resp_short = api_client.post(
+                '/api/v1/auth/bootstrap-admin/',
+                {'username': 'admin', 'password': '123'},
+                format='json',
+                HTTP_X_ADMIN_BOOTSTRAP_KEY=valid_secret
+            )
+            assert resp_short.status_code == status.HTTP_400_BAD_REQUEST
+
+            # Non-dict payload
+            resp_bad = api_client.post(
+                '/api/v1/auth/bootstrap-admin/',
+                ['not', 'a', 'dict'],
+                format='json',
+                HTTP_X_ADMIN_BOOTSTRAP_KEY=valid_secret
+            )
+            assert resp_bad.status_code == status.HTTP_400_BAD_REQUEST
+        finally:
+            settings.ADMIN_BOOTSTRAP_SECRET = old_secret
+
