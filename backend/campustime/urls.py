@@ -23,6 +23,9 @@ def health_check(request):
     Returns HTTP 200 with service status. Never leaks credentials, stack traces, or internal data.
     """
     db_status = "healthy"
+    db_engine = connection.vendor
+    tables_synced = True
+
     if request.path.startswith('/api/v1/health'):
         try:
             with connection.cursor() as cursor:
@@ -30,11 +33,20 @@ def health_check(request):
         except Exception:
             db_status = "unavailable"
 
+        try:
+            from apps.accounts.models import User
+            _ = User.objects.exists()
+        except Exception:
+            tables_synced = False
+            db_status = "uninitialized"
+
     status_code = 200 if db_status == "healthy" else 503
     return JsonResponse({
         'status': 'healthy' if status_code == 200 else 'degraded',
         'service': 'campustime-api',
         'database': db_status,
+        'database_engine': db_engine,
+        'tables_synced': tables_synced,
         'environment': 'development' if settings.DEBUG else 'production',
     }, status=status_code)
 

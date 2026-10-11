@@ -186,3 +186,34 @@ class TestAuthenticationAPI:
         data = res_api.json()
         assert data['status'] == 'healthy'
         assert data['database'] == 'healthy'
+        assert data['tables_synced'] is True
+        assert data['database_engine'] in ('sqlite', 'postgresql')
+
+    def test_login_invalid_credentials_returns_401_not_500(self, api_client):
+        """Invalid credentials must return 401 Unauthorized, never 500 Internal Server Error."""
+        response = api_client.post('/api/v1/auth/token/', {
+            'username': 'nonexistent_user_xyz',
+            'password': 'WrongPassword123!',
+        }, format='json')
+        assert response.status_code == status.HTTP_401_UNAUTHORIZED
+        assert 'detail' in response.json()
+
+    def test_login_empty_payload_returns_400(self, api_client):
+        """Empty payload must return 400 Bad Request with field errors."""
+        response = api_client.post('/api/v1/auth/token/', {}, format='json')
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        errors = response.json()
+        assert 'username' in errors
+        assert 'password' in errors
+
+    def test_database_url_parsing_without_type_error(self):
+        """Ensure DATABASE_URL config parses postgresql urls cleanly with CONN_MAX_AGE."""
+        import environ
+        test_env = environ.Env()
+        sample_pg_url = 'postgresql://user:pass@ep-cool-fog-123456.us-east-2.aws.neon.tech/neondb?sslmode=require'
+        test_env.ENVIRON['DATABASE_URL'] = sample_pg_url
+        db_config = test_env.db_url('DATABASE_URL')
+        db_config['CONN_MAX_AGE'] = 600
+        assert db_config['ENGINE'] == 'django.db.backends.postgresql'
+        assert db_config['NAME'] == 'neondb'
+        assert db_config['CONN_MAX_AGE'] == 600

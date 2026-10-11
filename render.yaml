@@ -9,7 +9,7 @@ services:
     rootDir: backend
     plan: free
     buildCommand: bash build.sh
-    startCommand: gunicorn campustime.wsgi:application --bind 0.0.0.0:$PORT
+    startCommand: python manage.py migrate --no-input && python manage.py seed_academic_data && gunicorn campustime.wsgi:application --bind 0.0.0.0:$PORT
     healthCheckPath: /health/
     autoDeploy: false
     envVars:

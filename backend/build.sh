@@ -12,7 +12,10 @@ pip install -r requirements.txt
 echo ">>> [2/3] Collecting static files with WhiteNoise..."
 python manage.py collectstatic --no-input
 
-echo ">>> [3/3] Running database migrations..."
+echo ">>> [3/4] Running database migrations..."
 python manage.py migrate --no-input
+
+echo ">>> [4/4] Ensuring academic baseline seed data..."
+python manage.py seed_academic_data
 
 echo ">>> CampusTime build completed successfully!"

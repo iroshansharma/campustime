@@ -130,12 +130,14 @@ ASGI_APPLICATION = 'campustime.asgi.application'
 # Database Configuration
 # Support PostgreSQL via DATABASE_URL; fallback to SQLite for local development
 db_url = env('DATABASE_URL')
-use_sqlite = env('USE_SQLITE')
+use_sqlite = env.bool('USE_SQLITE', default=False)
 
 if db_url and not use_sqlite:
     try:
+        db_config = env.db_url('DATABASE_URL')
+        db_config['CONN_MAX_AGE'] = 600
         DATABASES = {
-            'default': env.db_url('DATABASE_URL', conn_max_age=600)
+            'default': db_config
         }
     except Exception:
         DATABASES = {
@@ -151,6 +153,40 @@ else:
             'NAME': BASE_DIR / 'db.sqlite3',
         }
     }
+
+# Logging configuration: Send logs to console so Render stdout/stderr captures them
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '[{asctime}] {levelname} {name}: {message}',
+            'style': '{',
+        },
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'verbose',
+        },
+    },
+    'root': {
+        'handlers': ['console'],
+        'level': 'INFO',
+    },
+    'loggers': {
+        'django.request': {
+            'handlers': ['console'],
+            'level': 'ERROR',
+            'propagate': False,
+        },
+        'apps': {
+            'handlers': ['console'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+    },
+}
 
 # Custom User Model
 AUTH_USER_MODEL = 'accounts.User'
